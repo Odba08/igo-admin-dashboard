@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, useTheme } from "@mui/material";
+import { Box, Typography, useTheme, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
 import { tokens } from "../../theme";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
@@ -7,7 +7,7 @@ import ShoppingBagIcon from "@mui/icons-material/ShoppingBag";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import Header from "../../components/Header";
 import StatBox from "../../components/StatBox";
-import { getOrders, getUsers, getBusinesses, getProducts } from "../../services/api";
+import { getOrders, getUsers, getBusinesses, getProducts, getSetting, updateSetting } from "../../services/api";
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -16,6 +16,20 @@ const Dashboard = () => {
   const [orders, setOrders] = useState([]);
   const [usersCount, setUsersCount] = useState(0);
   const [businessesCount, setBusinessesCount] = useState(0);
+
+  // BCV Rate states
+  const [bcvRate, setBcvRate] = useState("75.54");
+  const [openBcvModal, setOpenBcvModal] = useState(false);
+  const [tempBcvRate, setTempBcvRate] = useState("");
+
+  const fetchBcvRate = async () => {
+    try {
+      const res = await getSetting("BCV_RATE");
+      setBcvRate(res.data.value);
+    } catch (err) {
+      console.error("Error loading BCV rate:", err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -36,9 +50,28 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 10000); // Refresco automático de ventas y estado de órdenes cada 10s
+    fetchBcvRate();
+    const interval = setInterval(() => {
+      fetchDashboardData();
+      fetchBcvRate();
+    }, 10000); // Refresco automático cada 10s
     return () => clearInterval(interval);
   }, []);
+
+  const handleSaveBcvRate = async () => {
+    try {
+      await updateSetting("BCV_RATE", tempBcvRate);
+      setBcvRate(tempBcvRate);
+      setOpenBcvModal(false);
+    } catch (err) {
+      alert("Error al actualizar la tasa BCV: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleOpenBcvModal = () => {
+    setTempBcvRate(bcvRate);
+    setOpenBcvModal(true);
+  };
 
   const totalSales = orders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
 
@@ -75,6 +108,32 @@ const Dashboard = () => {
       {/* HEADER */}
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Header title="PANEL PRINCIPAL" subtitle="Métricas en vivo de Igo Lat" />
+
+        {/* TASA BCV WIDGET */}
+        <Box 
+          display="flex" 
+          alignItems="center" 
+          gap="15px" 
+          bgcolor={colors.primary[400]} 
+          p="10px 20px" 
+          borderRadius="8px"
+          border={`1px solid ${colors.grey[700]}`}
+        >
+          <Box>
+            <Typography variant="body2" color={colors.grey[300]}>Tasa Oficial BCV</Typography>
+            <Typography variant="h4" fontWeight="bold" color={colors.greenAccent[500]}>
+              {bcvRate} Bs/$
+            </Typography>
+          </Box>
+          <Button 
+            variant="contained" 
+            color="secondary"
+            onClick={handleOpenBcvModal}
+            sx={{ fontWeight: "bold", backgroundColor: colors.greenAccent[500], color: "#000", "&:hover": { backgroundColor: colors.greenAccent[600] } }}
+          >
+            Actualizar
+          </Button>
+        </Box>
       </Box>
 
       {/* GRID & CHARTS */}
@@ -277,6 +336,32 @@ const Dashboard = () => {
           ))}
         </Box>
       </Box>
+
+      {/* MODAL TASA BCV */}
+      <Dialog open={openBcvModal} onClose={() => setOpenBcvModal(false)}>
+        <DialogTitle sx={{ fontWeight: "bold" }}>Actualizar Tasa Oficial BCV</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            Introduce el valor de la tasa BCV del día. Este valor se reflejará en la aplicación móvil de los clientes al momento de realizar la compra.
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Tasa BCV (Bs/$)"
+            type="number"
+            fullWidth
+            variant="outlined"
+            value={tempBcvRate}
+            onChange={(e) => setTempBcvRate(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: "20px" }}>
+          <Button onClick={() => setOpenBcvModal(false)} sx={{ color: colors.grey[100] }}>Cancelar</Button>
+          <Button onClick={handleSaveBcvRate} variant="contained" color="secondary" sx={{ fontWeight: "bold" }}>
+            Guardar Tasa
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

@@ -8,7 +8,7 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
-import { getOrders, updateOrder, getBusinesses } from "../../services/api";
+import { getOrders, updateOrder, getBusinesses, getUsers } from "../../services/api";
 
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
@@ -27,6 +27,8 @@ const Invoices = () => {
 
   const [activeTab, setActiveTab] = useState(0);
   const [orders, setOrders] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [editDeliveryUserId, setEditDeliveryUserId] = useState("");
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -119,9 +121,21 @@ const Invoices = () => {
     }
   };
 
+  const fetchDrivers = async () => {
+    try {
+      const res = await getUsers();
+      const list = res.data || [];
+      const filtered = list.filter(u => u.roles?.includes("empleado") || u.roles?.includes("worker"));
+      setDrivers(filtered);
+    } catch (err) {
+      console.error("Error fetching drivers:", err);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchBusinesses();
+    fetchDrivers();
     const interval = setInterval(fetchOrders, 10000); // Polling cada 10s
     return () => clearInterval(interval);
   }, []);
@@ -135,6 +149,31 @@ const Invoices = () => {
       }
     }
   }, [selectedBizId, businesses]);
+
+  const handleSetThisMonth = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    setStartDate(start.toISOString().split("T")[0]);
+    setEndDate(end.toISOString().split("T")[0]);
+  };
+
+  const handleSetLastMonth = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    setStartDate(start.toISOString().split("T")[0]);
+    setEndDate(end.toISOString().split("T")[0]);
+  };
+
+  const handleSetLast30Days = () => {
+    const d = new Date();
+    const end = d.toISOString().split("T")[0];
+    d.setDate(d.getDate() - 30);
+    const start = d.toISOString().split("T")[0];
+    setStartDate(start);
+    setEndDate(end);
+  };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
@@ -167,6 +206,7 @@ const Invoices = () => {
     setEditTotalAmount(order.totalAmount || 0);
     setEditLat(order.deliveryLat || 0);
     setEditLng(order.deliveryLong || 0);
+    setEditDeliveryUserId(order.deliveryUser?.id || "");
     setEditOpen(true);
   };
 
@@ -312,7 +352,8 @@ const Invoices = () => {
         deliveryFee: parseFloat(editDeliveryFee),
         totalAmount: parseFloat(editTotalAmount),
         deliveryLat: parseFloat(editLat),
-        deliveryLong: parseFloat(editLng)
+        deliveryLong: parseFloat(editLng),
+        deliveryUserId: editDeliveryUserId || null
       });
       setEditOpen(false);
       fetchOrders();
@@ -333,7 +374,7 @@ const Invoices = () => {
     if (!selectedBizId) return {
       filteredOrders: [], totalPaidOrders: 0, itemsSubtotal: 0, deliverySubtotal: 0,
       totalAmountSum: 0, iGoTotal: 0, bizTotal: 0, mixTotal: 0,
-      igoOwesBiz: 0, bizOwesIgo: 0, netOwed: 0
+      igoOwesBizProducts: 0, bizOwesIgoDelivery: 0, commissionAmount: 0, netOwed: 0
     };
 
     const start = new Date(startDate);
@@ -361,15 +402,18 @@ const Invoices = () => {
     const bizTotal = biz.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const mixTotal = mix.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
-    // Balances
-    const igoOwesBiz = iGo.reduce((sum, o) => sum + (o.totalItems || 0), 0);
-    const bizOwesIgo = biz.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+    // Commission
+    const commissionAmount = itemsSubtotal * (customCommission / 100);
 
-    const netOwed = igoOwesBiz - bizOwesIgo;
+    // Balances
+    const igoOwesBizProducts = iGo.reduce((sum, o) => sum + (o.totalItems || 0), 0);
+    const bizOwesIgoDelivery = biz.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+
+    const netOwed = igoOwesBizProducts - commissionAmount - bizOwesIgoDelivery;
 
     return {
       filteredOrders: filtered, totalPaidOrders, itemsSubtotal, deliverySubtotal, totalAmountSum,
-      iGoTotal, bizTotal, mixTotal, igoOwesBiz, bizOwesIgo, netOwed
+      iGoTotal, bizTotal, mixTotal, igoOwesBizProducts, bizOwesIgoDelivery, commissionAmount, netOwed
     };
   };
 
@@ -426,6 +470,7 @@ const Invoices = () => {
               <h3>Ventas del Aliado</h3>
               <p><strong>Total Pedidos Pagados:</strong> ${settlement.totalPaidOrders}</p>
               <p><strong>Subtotal Productos:</strong> $${settlement.itemsSubtotal.toFixed(2)}</p>
+              <p><strong>Comisión IGO (${customCommission}%):</strong> $${settlement.commissionAmount.toFixed(2)}</p>
               <p><strong>Subtotal Envío (Costo Delivery):</strong> $${settlement.deliverySubtotal.toFixed(2)}</p>
             </div>
             <div>
@@ -433,8 +478,8 @@ const Invoices = () => {
               <p><strong>Cobrado en Plataforma IGO (Pago IGO):</strong> $${settlement.iGoTotal.toFixed(2)}</p>
               <p><strong>Cobrado en Punto Físico (Pago Negocio):</strong> $${settlement.bizTotal.toFixed(2)}</p>
               <p><strong>Cobrado en Modelo Mixto (Mix):</strong> $${settlement.mixTotal.toFixed(2)}</p>
-              <p><strong>IGO debe transferir (Productos Pago IGO):</strong> $${settlement.igoOwesBiz.toFixed(2)}</p>
-              <p><strong>Negocio debe transferir (Delivery Pago Negocio):</strong> $${settlement.bizOwesIgo.toFixed(2)}</p>
+              <p><strong>IGO debe transferir (Ventas Pago IGO):</strong> $${settlement.igoOwesBizProducts.toFixed(2)}</p>
+              <p><strong>Negocio debe transferir (Delivery Pago Negocio + Comisión):</strong> $${(settlement.bizOwesIgoDelivery + settlement.commissionAmount).toFixed(2)}</p>
               <hr style="border: none; border-top: 1px solid #dee2e6; margin: 12px 0;"/>
               ${settlement.netOwed >= 0 
                 ? `<p class="highlight"><strong>Saldo a Favor del Negocio (IGO transfiere):</strong> $${settlement.netOwed.toFixed(2)}</p>` 
@@ -838,6 +883,14 @@ const Invoices = () => {
                     ))}
                   </Select>
                 </FormControl>
+
+                <TextField
+                  label="Comisión (%)"
+                  type="number"
+                  value={customCommission}
+                  onChange={(e) => setCustomCommission(parseFloat(e.target.value) || 0)}
+                  sx={{ width: "120px" }}
+                />
                 
                 <TextField
                   label="Desde"
@@ -854,6 +907,12 @@ const Invoices = () => {
                   onChange={(e) => setEndDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                 />
+
+                <Box display="flex" gap="10px">
+                  <Button variant="outlined" onClick={handleSetThisMonth} sx={{ color: colors.grey[100], borderColor: colors.grey[500], height: "45px" }}>Este Mes</Button>
+                  <Button variant="outlined" onClick={handleSetLastMonth} sx={{ color: colors.grey[100], borderColor: colors.grey[500], height: "45px" }}>Mes Pasado</Button>
+                  <Button variant="outlined" onClick={handleSetLast30Days} sx={{ color: colors.grey[100], borderColor: colors.grey[500], height: "45px" }}>30 Días</Button>
+                </Box>
 
                 <Button
                   variant="contained"
@@ -929,12 +988,21 @@ const Invoices = () => {
                     </Box>
                     <Divider sx={{ my: 1 }} />
                     <Box display="flex" justifyContent="space-between">
-                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>IGO debe transferir (Productos Pago IGO):</Typography>
-                      <Typography variant="body2" fontWeight="bold" color="#4CD964">${settlement.igoOwesBiz.toFixed(2)}</Typography>
+                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>IGO debe transferir (Ventas Pago IGO):</Typography>
+                      <Typography variant="body2" fontWeight="bold" color="#4CD964">${settlement.igoOwesBizProducts.toFixed(2)}</Typography>
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>Comisión retenida por IGO (${customCommission}%):</Typography>
+                      <Typography variant="body2" fontWeight="bold" color="#FF3B30">${settlement.commissionAmount.toFixed(2)}</Typography>
                     </Box>
                     <Box display="flex" justifyContent="space-between">
                       <Typography variant="body2" sx={{ fontStyle: 'italic' }}>Negocio debe transferir (Delivery Pago Negocio):</Typography>
-                      <Typography variant="body2" fontWeight="bold" color="#FF3B30">${settlement.bizOwesIgo.toFixed(2)}</Typography>
+                      <Typography variant="body2" fontWeight="bold" color="#FF3B30">${settlement.bizOwesIgoDelivery.toFixed(2)}</Typography>
+                    </Box>
+                    <Divider sx={{ my: 0.5 }} />
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography variant="body2" sx={{ fontStyle: 'italic', fontWeight: 'bold' }}>Negocio debe total (Delivery + Comisión):</Typography>
+                      <Typography variant="body2" fontWeight="bold" color="#FF3B30">${(settlement.bizOwesIgoDelivery + settlement.commissionAmount).toFixed(2)}</Typography>
                     </Box>
                   </Box>
                 </Box>
@@ -1079,6 +1147,22 @@ const Invoices = () => {
               </Select>
             </FormControl>
 
+            <FormControl fullWidth>
+              <InputLabel>Motorizado Asignado</InputLabel>
+              <Select
+                value={editDeliveryUserId}
+                label="Motorizado Asignado"
+                onChange={(e) => setEditDeliveryUserId(e.target.value)}
+              >
+                <MenuItem value=""><em>Ninguno (Disponible para todos)</em></MenuItem>
+                {drivers.map((driver) => (
+                  <MenuItem key={driver.id} value={driver.id}>
+                    {driver.fullName} ({driver.vehicle || "Sin Vehículo"})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
             <TextField
               label="Latitud de Entrega"
               type="number"
@@ -1163,8 +1247,83 @@ const Invoices = () => {
                   <Typography variant="body1"><strong>Estado Pago:</strong> {infoOrder.isPaid ? "PAGADO" : "PENDIENTE"}</Typography>
                   <Typography variant="body1"><strong>Distancia Ruta:</strong> {infoOrder.distance || "N/A"}</Typography>
                   <Typography variant="body1"><strong>Coordenadas GPS:</strong> Lat: {infoOrder.deliveryLat}, Lng: {infoOrder.deliveryLong}</Typography>
+                  <Typography variant="body1"><strong>Motorizado:</strong> {infoOrder.deliveryUser?.fullName || "No asignado / Disponible"}</Typography>
                 </Box>
               </Paper>
+
+              {/* Bloque Historial de Horarios (Timeline) */}
+              <Paper variant="outlined" sx={{ p: "15px", bgcolor: "rgba(255,255,255,0.02)", borderColor: colors.grey[700] }}>
+                <Typography variant="h6" color={colors.greenAccent[500]} fontWeight="bold" mb="10px">
+                  Historial de Horarios (Desempeño)
+                </Typography>
+                <Box display="grid" gridTemplateColumns="repeat(3, 1fr)" gap="15px" mb="10px">
+                  <Typography variant="body1">
+                    <strong>1. Creado a las:</strong> <br />
+                    {infoOrder.createdAt ? new Date(infoOrder.createdAt).toLocaleString("es-VE") : "N/A"}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>2. Aceptado a las:</strong> <br />
+                    {infoOrder.acceptedAt ? new Date(infoOrder.acceptedAt).toLocaleString("es-VE") : "Pendiente de aceptar"}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>3. Entregado a las:</strong> <br />
+                    {infoOrder.completedAt ? new Date(infoOrder.completedAt).toLocaleString("es-VE") : "En camino"}
+                  </Typography>
+                </Box>
+                <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,0.05)" }} />
+                <Box display="flex" flexDirection="column" gap="4px">
+                  {infoOrder.createdAt && infoOrder.acceptedAt && (() => {
+                    const diffMin = Math.round((new Date(infoOrder.acceptedAt) - new Date(infoOrder.createdAt)) / 60000);
+                    return (
+                      <Typography variant="body2" color={colors.grey[300]}>
+                        ⏱️ <strong>Tiempo para ser tomado:</strong> {diffMin} minutos
+                      </Typography>
+                    );
+                  })()}
+                  {infoOrder.acceptedAt && infoOrder.completedAt && (() => {
+                    const diffMin = Math.round((new Date(infoOrder.completedAt) - new Date(infoOrder.acceptedAt)) / 60000);
+                    return (
+                      <Typography variant="body2" color={colors.grey[300]}>
+                        🛵 <strong>Tiempo de trayecto (Envío):</strong> {diffMin} minutos
+                      </Typography>
+                    );
+                  })()}
+                  {infoOrder.createdAt && infoOrder.completedAt && (() => {
+                    const diffMin = Math.round((new Date(infoOrder.completedAt) - new Date(infoOrder.createdAt)) / 60000);
+                    return (
+                      <Typography variant="body2" color={colors.greenAccent[400]} sx={{ fontWeight: "bold" }}>
+                        ✅ <strong>Tiempo total de entrega:</strong> {diffMin} minutos
+                      </Typography>
+                    );
+                  })()}
+                </Box>
+              </Paper>
+
+              {/* Bloque Foto de Entrega (Prueba de entrega) */}
+              {infoOrder.photoUrl && (
+                <Paper variant="outlined" sx={{ p: "15px", bgcolor: "rgba(255,255,255,0.02)", borderColor: colors.grey[700], display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <Typography variant="h6" color={colors.greenAccent[500]} fontWeight="bold" mb="10px" width="100%">
+                    Comprobante Fotográfico de Entrega
+                  </Typography>
+                  <Box 
+                    component="img" 
+                    src={infoOrder.photoUrl} 
+                    alt="Comprobante de entrega"
+                    sx={{ 
+                      maxWidth: "100%", 
+                      maxHeight: "350px", 
+                      borderRadius: "8px", 
+                      objectFit: "contain", 
+                      boxShadow: "0px 4px 10px rgba(0,0,0,0.5)",
+                      cursor: "pointer"
+                    }}
+                    onClick={() => window.open(infoOrder.photoUrl, "_blank")}
+                  />
+                  <Typography variant="caption" color={colors.grey[400]} sx={{ mt: 1 }}>
+                    Haga clic en la imagen para verla en tamaño completo.
+                  </Typography>
+                </Paper>
+              )}
 
               {/* Bloque Detalle de los Productos Comprados */}
               <Box>

@@ -48,6 +48,10 @@ export const getBusinessByOwner = (ownerId) => api.get(`/business/owner/${ownerI
 export const deleteBusiness = (businessId) => api.delete(`/business/${businessId}`);
 export const deleteUser = (id) => api.delete(`/users/${id}`);
 
+// Settings Services
+export const getSetting = (key) => api.get(`/settings/${key}`);
+export const updateSetting = (key, value) => api.patch(`/settings/${key}`, { value });
+
 // Image Upload Services
 export const uploadUserImage = (formData) => api.post('/files/user', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
