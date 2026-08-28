@@ -8,7 +8,7 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
-import { getOrders, updateOrder, getBusinesses, getUsers } from "../../services/api";
+import { getOrders, updateOrder, getBusinesses, getUsers, uploadProductImage } from "../../services/api";
 
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
@@ -48,6 +48,8 @@ const Invoices = () => {
   const [editTotalAmount, setEditTotalAmount] = useState(0);
   const [editLat, setEditLat] = useState(0);
   const [editLng, setEditLng] = useState(0);
+  const [editPaymentCaptureUrl, setEditPaymentCaptureUrl] = useState("");
+  const [uploadingPaymentCapture, setUploadingPaymentCapture] = useState(false);
 
   // States for Settlements
   const [selectedBizId, setSelectedBizId] = useState("");
@@ -207,6 +209,7 @@ const Invoices = () => {
     setEditLat(order.deliveryLat || 0);
     setEditLng(order.deliveryLong || 0);
     setEditDeliveryUserId(order.deliveryUser?.id || "");
+    setEditPaymentCaptureUrl(order.paymentCaptureUrl || "");
     setEditOpen(true);
   };
 
@@ -347,6 +350,7 @@ const Invoices = () => {
         shippingType: editShippingType,
         paymentRecipient: editPaymentRecipient,
         isPaid: editIsPaid,
+        paymentCaptureUrl: editPaymentCaptureUrl,
         status: editStatus,
         totalItems: parseFloat(editTotalItems),
         deliveryFee: parseFloat(editDeliveryFee),
@@ -1131,6 +1135,64 @@ const Invoices = () => {
               sx={{ mt: 1 }}
             />
 
+            {/* Subida de Capture de Pago */}
+            <Box gridColumn="span 2" display="flex" flexDirection="column" gap="10px" mt="10px" sx={{ border: `1px dashed ${colors.grey[700]}`, p: "15px", borderRadius: "8px" }}>
+              <Typography fontWeight="bold" variant="body1" color={colors.greenAccent[500]}>
+                Capture de Pago (Comprobante)
+              </Typography>
+              <Box display="flex" alignItems="center" gap="20px">
+                {editPaymentCaptureUrl ? (
+                  <Box display="flex" alignItems="flex-start" gap="15px">
+                    <Box 
+                      component="img" 
+                      src={editPaymentCaptureUrl} 
+                      alt="Capture de pago" 
+                      sx={{ width: 120, height: 120, objectFit: "contain", borderRadius: "8px", border: `1px solid ${colors.grey[700]}`, bgcolor: "#000" }} 
+                    />
+                    <Button 
+                      variant="outlined" 
+                      color="error" 
+                      size="small" 
+                      onClick={() => setEditPaymentCaptureUrl("")}
+                      sx={{ textTransform: "none", fontWeight: "bold" }}
+                    >
+                      Eliminar Capture
+                    </Button>
+                  </Box>
+                ) : (
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    color="secondary"
+                    disabled={uploadingPaymentCapture}
+                    sx={{ height: "50px", textTransform: "none", fontWeight: "bold" }}
+                  >
+                    {uploadingPaymentCapture ? "Subiendo..." : "Subir Capture de Pago"}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append("file", file);
+                        setUploadingPaymentCapture(true);
+                        try {
+                          const res = await uploadProductImage(formData);
+                          setEditPaymentCaptureUrl(res.data.secureUrl);
+                        } catch (err) {
+                          alert("Error al subir el capture de pago: " + (err.response?.data?.message || err.message));
+                        } finally {
+                          setUploadingPaymentCapture(false);
+                        }
+                      }}
+                    />
+                  </Button>
+                )}
+              </Box>
+            </Box>
+
             <FormControl fullWidth>
               <InputLabel>Estado Logístico</InputLabel>
               <Select
@@ -1318,6 +1380,32 @@ const Invoices = () => {
                       cursor: "pointer"
                     }}
                     onClick={() => window.open(infoOrder.photoUrl, "_blank")}
+                  />
+                  <Typography variant="caption" color={colors.grey[400]} sx={{ mt: 1 }}>
+                    Haga clic en la imagen para verla en tamaño completo.
+                  </Typography>
+                </Paper>
+              )}
+
+              {/* Bloque Capture de Pago */}
+              {infoOrder.paymentCaptureUrl && (
+                <Paper variant="outlined" sx={{ p: "15px", bgcolor: "rgba(255,255,255,0.02)", borderColor: colors.grey[700], display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <Typography variant="h6" color={colors.greenAccent[500]} fontWeight="bold" mb="10px" width="100%">
+                    Capture de Pago Registrado
+                  </Typography>
+                  <Box 
+                    component="img" 
+                    src={infoOrder.paymentCaptureUrl} 
+                    alt="Capture de pago"
+                    sx={{ 
+                      maxWidth: "100%", 
+                      maxHeight: "350px", 
+                      borderRadius: "8px", 
+                      objectFit: "contain", 
+                      boxShadow: "0px 4px 10px rgba(0,0,0,0.5)",
+                      cursor: "pointer"
+                    }}
+                    onClick={() => window.open(infoOrder.paymentCaptureUrl, "_blank")}
                   />
                   <Typography variant="caption" color={colors.grey[400]} sx={{ mt: 1 }}>
                     Haga clic en la imagen para verla en tamaño completo.
