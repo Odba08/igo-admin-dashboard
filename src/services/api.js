@@ -18,6 +18,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      if (localStorage.getItem('adminToken')) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('user');
+        window.location.reload();
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth Services
 export const loginAdmin = (email, password) => api.post('/auth/login', { email, password });
 
@@ -54,15 +68,55 @@ export const getSetting = (key) => api.get(`/settings/${key}`);
 export const updateSetting = (key, value) => api.patch(`/settings/${key}`, { value });
 
 // Image Upload Services
-export const uploadUserImage = (formData) => api.post('/files/user', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
-export const uploadProductImage = (formData) => api.post('/files/products', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
-export const uploadBusinessImage = (formData) => api.post('/files/bussiness', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
+const uploadToImgBBDirect = async (formData) => {
+  const apiKey = '6dfbf7cb3ce7d636c4e9b06b5a89624e';
+  const file = formData.get('file');
+  if (!file) throw new Error('No se encontró archivo');
+
+  const imgForm = new FormData();
+  imgForm.append('image', file);
+  if (file.name) {
+    imgForm.append('name', file.name.split('.')[0]);
+  }
+
+  const response = await axios.post(`https://api.imgbb.com/1/upload?key=${apiKey}`, imgForm);
+  if (response.data && response.data.success && response.data.data) {
+    const secureUrl = response.data.data.url || response.data.data.display_url;
+    return { data: { secureUrl } };
+  }
+  throw new Error('Error al obtener URL de ImgBB');
+};
+
+export const uploadUserImage = async (formData) => {
+  try {
+    return await uploadToImgBBDirect(formData);
+  } catch (e) {
+    return api.post('/files/user', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
+
+export const uploadProductImage = async (formData) => {
+  try {
+    return await uploadToImgBBDirect(formData);
+  } catch (e) {
+    return api.post('/files/products', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
+
+export const uploadBusinessImage = async (formData) => {
+  try {
+    return await uploadToImgBBDirect(formData);
+  } catch (e) {
+    return api.post('/files/bussiness', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
 
 export default api;
+
 

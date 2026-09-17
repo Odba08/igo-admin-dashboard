@@ -20,6 +20,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import InfoIcon from "@mui/icons-material/Info";
+import DownloadIcon from "@mui/icons-material/Download";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 
 const Invoices = () => {
   const theme = useTheme();
@@ -98,11 +101,97 @@ const Invoices = () => {
     return true;
   });
 
+  const prevPendingCount = React.useRef(0);
+  const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
+
+  const playNewOrderSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+      
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.log("Audio not enabled yet", e);
+    }
+  };
+
+  const exportOrdersToCSV = (ordersList, fileName = "pedidos_igostore.csv") => {
+    if (!ordersList || ordersList.length === 0) {
+      alert("No hay órdenes para exportar.");
+      return;
+    }
+
+    const headers = [
+      "Nº Orden",
+      "Fecha",
+      "Cliente",
+      "Email",
+      "Comercio",
+      "Categoria",
+      "Estado",
+      "Pagado",
+      "Metodo Pago",
+      "Tipo Envio",
+      "Subtotal ($)",
+      "Delivery Fee ($)",
+      "Total ($)",
+      "Direccion Entrega"
+    ];
+
+    const rows = ordersList.map(o => [
+      `"${String(o.orderNumber || '').padStart(4, '0')}"`,
+      `"${new Date(o.createdAt).toLocaleString('es-VE')}"`,
+      `"${(o.user?.fullName || o.userIdTemp || 'Cliente').replace(/"/g, '""')}"`,
+      `"${(o.user?.email || 'N/A').replace(/"/g, '""')}"`,
+      `"${(o.business?.name || o.category || 'General').replace(/"/g, '""')}"`,
+      `"${(o.category || 'Comida').replace(/"/g, '""')}"`,
+      `"${o.status}"`,
+      `"${o.isPaid ? 'SI' : 'NO'}"`,
+      `"${(o.paymentRecipient || 'N/A').replace(/"/g, '""')}"`,
+      `"${(o.shippingType || 'N/A').replace(/"/g, '""')}"`,
+      (Number(o.totalAmount || 0) - Number(o.deliveryFee || 0)).toFixed(2),
+      Number(o.deliveryFee || 0).toFixed(2),
+      Number(o.totalAmount || 0).toFixed(2),
+      `"${(o.deliveryAddress || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const fetchOrders = async () => {
     try {
-      setLoading(true);
       const res = await getOrders();
-      setOrders(res.data);
+      const newOrders = res.data || [];
+      const pendingCount = newOrders.filter(o => o.status === 'PENDING' || o.status === 'CREATED').length;
+      
+      if (soundAlertEnabled && pendingCount > prevPendingCount.current && prevPendingCount.current >= 0) {
+        playNewOrderSound();
+      }
+      prevPendingCount.current = pendingCount;
+      setOrders(newOrders);
     } catch (err) {
       console.error("Error fetching orders:", err);
     } finally {
@@ -140,7 +229,7 @@ const Invoices = () => {
     fetchDrivers();
     const interval = setInterval(fetchOrders, 10000); // Polling cada 10s
     return () => clearInterval(interval);
-  }, []);
+  }, [soundAlertEnabled]);
 
   // Update commission estimate when business selection changes
   useEffect(() => {
@@ -756,10 +845,38 @@ const Invoices = () => {
         <Box m="20px 0 0 0">
           {/* Barra de Filtros de Pedidos */}
           <Card sx={{ backgroundColor: colors.primary[400], mb: "15px", p: "15px", border: `1px solid ${colors.grey[700]}` }}>
-            <CardContent sx={{ p: "8px !important" }}>
-              <Typography variant="h5" color={colors.greenAccent[500]} gutterBottom fontWeight="bold" sx={{ mb: 1.5 }}>
-                Filtros de Pedidos
-              </Typography>
+            <CardContent sx={{ p: "12px !important" }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" sx={{ mb: 1.5 }}>
+                <Typography variant="h5" color={colors.greenAccent[500]} fontWeight="bold">
+                  Filtros de Pedidos ({filteredOrders.length})
+                </Typography>
+                <Box display="flex" alignItems="center" gap="12px">
+                  <FormControlLabel
+                    control={
+                      <Switch 
+                        checked={soundAlertEnabled} 
+                        onChange={(e) => setSoundAlertEnabled(e.target.checked)} 
+                        color="secondary"
+                      />
+                    }
+                    label={
+                      <Box display="flex" alignItems="center" gap="4px">
+                        {soundAlertEnabled ? <VolumeUpIcon color="secondary" fontSize="small" /> : <VolumeOffIcon fontSize="small" />}
+                        <Typography variant="body2" fontWeight="bold">Alerta Sonora</Typography>
+                      </Box>
+                    }
+                  />
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => exportOrdersToCSV(filteredOrders, `pedidos_filtrados_${new Date().toISOString().slice(0,10)}.csv`)}
+                    sx={{ backgroundColor: colors.greenAccent[600], color: "#000", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[700] } }}
+                  >
+                    Exportar CSV
+                  </Button>
+                </Box>
+              </Box>
               <Box display="flex" flexWrap="wrap" gap="15px" alignItems="center">
                 <TextField
                   label="Nº Orden"
@@ -928,11 +1045,28 @@ const Invoices = () => {
                     color: "#000000", 
                     fontWeight: "bold",
                     height: "45px",
-                    px: "25px",
+                    px: "20px",
                     "&:hover": { backgroundColor: colors.greenAccent[600] } 
                   }}
                 >
-                  Descargar Reporte PDF
+                  Reporte PDF
+                </Button>
+
+                <Button
+                  variant="contained"
+                  color="info"
+                  startIcon={<DownloadIcon />}
+                  onClick={() => exportOrdersToCSV(settlement.filteredOrders, `liquidacion_${startDate}_a_${endDate}.csv`)}
+                  sx={{ 
+                    backgroundColor: colors.blueAccent[600], 
+                    color: "#ffffff", 
+                    fontWeight: "bold",
+                    height: "45px",
+                    px: "20px",
+                    "&:hover": { backgroundColor: colors.blueAccent[700] } 
+                  }}
+                >
+                  Exportar CSV
                 </Button>
               </Box>
             </CardContent>
