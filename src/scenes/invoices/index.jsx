@@ -8,7 +8,10 @@ import {
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
-import { getOrders, updateOrder, getBusinesses, getUsers, uploadProductImage } from "../../services/api";
+import ActiveDriversDrawer from "../../components/ActiveDriversDrawer";
+import PaymentVerificationModal from "../../components/PaymentVerificationModal";
+import { getOrders, updateOrder, getBusinesses, getUsers, uploadProductImage, assignOrderDriver, verifyOrderPayment, updateBusiness } from "../../services/api";
+import getSocket from "../../services/socket";
 
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
@@ -23,6 +26,9 @@ import InfoIcon from "@mui/icons-material/Info";
 import DownloadIcon from "@mui/icons-material/Download";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import TwoWheelerIcon from "@mui/icons-material/TwoWheeler";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 const Invoices = () => {
   const theme = useTheme();
@@ -36,6 +42,12 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoOrder, setInfoOrder] = useState(null);
+
+  // States for Drivers Drawer & Payment Verification Modal
+  const [driversDrawerOpen, setDriversDrawerOpen] = useState(false);
+  const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState(null);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [verifyOrder, setVerifyOrder] = useState(null);
 
   // States for Edit Order Modal
   const [editOpen, setEditOpen] = useState(false);
@@ -227,8 +239,35 @@ const Invoices = () => {
     fetchOrders();
     fetchBusinesses();
     fetchDrivers();
-    const interval = setInterval(fetchOrders, 10000); // Polling cada 10s
-    return () => clearInterval(interval);
+
+    const socket = getSocket();
+    if (socket) {
+      socket.on("order:created", (newOrder) => {
+        console.log("⚡ Nuevo pedido recibido por WebSocket:", newOrder);
+        fetchOrders();
+        if (soundAlertEnabled) {
+          playNewOrderSound();
+        }
+      });
+
+      socket.on("order:updated", () => {
+        fetchOrders();
+      });
+
+      socket.on("order:payment_verified", () => {
+        fetchOrders();
+      });
+    }
+
+    const interval = setInterval(fetchOrders, 10000); // Polling de respaldo cada 10s
+    return () => {
+      clearInterval(interval);
+      if (socket) {
+        socket.off("order:created");
+        socket.off("order:updated");
+        socket.off("order:payment_verified");
+      }
+    };
   }, [soundAlertEnabled]);
 
   // Update commission estimate when business selection changes
@@ -240,6 +279,30 @@ const Invoices = () => {
       }
     }
   }, [selectedBizId, businesses]);
+
+  const handleDriverDirectAssign = async (orderId, deliveryUserId) => {
+    try {
+      await assignOrderDriver(orderId, deliveryUserId || null);
+      fetchOrders();
+    } catch (err) {
+      alert("Error al asignar repartidor: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleVerifyPaymentDirect = async (orderId, isPaid) => {
+    try {
+      await verifyOrderPayment(orderId, isPaid);
+      setVerifyModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      alert("Error al verificar pago: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleOpenVerifyModal = (order) => {
+    setVerifyOrder(order);
+    setVerifyModalOpen(true);
+  };
 
   const handleSetThisMonth = () => {
     const now = new Date();
@@ -703,28 +766,33 @@ const Invoices = () => {
     },
     {
       field: "deliveryUser",
-      headerName: "Repartidor",
-      flex: 1,
-      renderCell: (params) => {
-        const du = params.row.deliveryUser;
-        if (!du) {
-          return (
-            <Typography variant="body2" color={colors.grey[400]} sx={{ fontStyle: 'italic' }}>
-              Sin Asignar
-            </Typography>
-          );
-        }
-        return (
-          <Box>
-            <Typography fontWeight="bold" sx={{ color: colors.greenAccent[300] }}>
-              {du.fullName}
-            </Typography>
-            <Typography variant="body2" color={colors.grey[300]}>
-              {du.email}
-            </Typography>
-          </Box>
-        );
-      }
+      headerName: "Repartidor Asignado",
+      width: 220,
+      renderCell: (params) => (
+        <Select
+          value={params.row.deliveryUser?.id || ""}
+          onChange={(e) => handleDriverDirectAssign(params.row.id, e.target.value)}
+          size="small"
+          displayEmpty
+          sx={{
+            fontSize: "12px",
+            height: "32px",
+            width: "100%",
+            bgcolor: params.row.deliveryUser ? "rgba(76, 206, 172, 0.12)" : "rgba(255,255,255,0.04)",
+            borderRadius: "6px",
+            "& .MuiSelect-select": { py: "4px" },
+          }}
+        >
+          <MenuItem value="">
+            <em style={{ color: "#a0aec0" }}>📢 Todos (Sin Asignar)</em>
+          </MenuItem>
+          {drivers.map((d) => (
+            <MenuItem key={d.id} value={d.id}>
+              🛵 {d.fullName || d.email} {d.vehicle ? `(${d.vehicle})` : ""}
+            </MenuItem>
+          ))}
+        </Select>
+      ),
     },
     {
       field: "totalAmount",
@@ -796,28 +864,75 @@ const Invoices = () => {
     {
       field: "actions",
       headerName: "Acciones",
-      width: 220,
+      width: 290,
       renderCell: (params) => (
-        <Box display="flex" gap="10px">
+        <Box display="flex" gap="6px" alignItems="center">
+          {/* Botón de Verificación de Pago y Capture */}
+          <Button
+            variant={params.row.isPaid ? "outlined" : "contained"}
+            color={params.row.isPaid ? "success" : "warning"}
+            size="small"
+            onClick={() => handleOpenVerifyModal(params.row)}
+            sx={{
+              fontSize: "11px",
+              py: "3px",
+              px: "8px",
+              textTransform: "none",
+              fontWeight: "bold",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {params.row.isPaid ? "Ver Pago" : "💳 Verificar"}
+          </Button>
+
           <Button
             variant="contained"
             color="secondary"
             size="small"
-            startIcon={<EditIcon sx={{ fontSize: "12px !important" }} />}
             onClick={() => handleOpenEditModal(params.row)}
-            sx={{ backgroundColor: colors.blueAccent[600], color: "#fff", fontSize: "10px", fontWeight: "bold", "&:hover": { backgroundColor: colors.blueAccent[700] } }}
+            sx={{
+              backgroundColor: colors.blueAccent[600],
+              color: "#fff",
+              fontSize: "10px",
+              fontWeight: "bold",
+              minWidth: "30px",
+              px: "6px",
+              "&:hover": { backgroundColor: colors.blueAccent[700] },
+            }}
           >
-            Corregir
+            Editar
           </Button>
+
           <Button
             variant="contained"
             color="info"
             size="small"
-            startIcon={<InfoIcon sx={{ fontSize: "12px !important" }} />}
             onClick={() => handleOpenInfoModal(params.row)}
-            sx={{ backgroundColor: colors.greenAccent[600], color: "#fff", fontSize: "10px", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[700] } }}
+            sx={{
+              backgroundColor: colors.greenAccent[600],
+              color: "#fff",
+              fontSize: "10px",
+              fontWeight: "bold",
+              minWidth: "30px",
+              px: "6px",
+              "&:hover": { backgroundColor: colors.greenAccent[700] },
+            }}
           >
-            Ver Info
+            Info
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => handleDownloadPDF(params.row)}
+            sx={{
+              minWidth: "30px",
+              px: "6px",
+              color: colors.grey[200],
+              borderColor: colors.grey[600],
+            }}
+          >
+            <PictureAsPdfIcon sx={{ fontSize: "16px" }} />
           </Button>
         </Box>
       )
@@ -866,6 +981,26 @@ const Invoices = () => {
                       </Box>
                     }
                   />
+
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    size="small"
+                    startIcon={<TwoWheelerIcon />}
+                    onClick={() => {
+                      setSelectedOrderForDrawer(null);
+                      setDriversDrawerOpen(true);
+                    }}
+                    sx={{
+                      backgroundColor: colors.blueAccent[600],
+                      color: "#fff",
+                      fontWeight: "bold",
+                      "&:hover": { backgroundColor: colors.blueAccent[700] },
+                    }}
+                  >
+                    Repartidores Activos
+                  </Button>
+
                   <Button
                     variant="contained"
                     size="small"
@@ -1633,6 +1768,29 @@ const Invoices = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Slidebar / Drawer Lateral de Repartidores Activos */}
+      <ActiveDriversDrawer
+        open={driversDrawerOpen}
+        onClose={() => {
+          setDriversDrawerOpen(false);
+          setSelectedOrderForDrawer(null);
+        }}
+        selectedOrder={selectedOrderForDrawer}
+        onAssignOrder={(orderId, driverId) => {
+          handleDriverDirectAssign(orderId, driverId);
+          setDriversDrawerOpen(false);
+          setSelectedOrderForDrawer(null);
+        }}
+      />
+
+      {/* Modal de Verificación de Pago y Comprobante Bancario */}
+      <PaymentVerificationModal
+        open={verifyModalOpen}
+        onClose={() => setVerifyModalOpen(false)}
+        order={verifyOrder}
+        onVerifyPayment={handleVerifyPaymentDirect}
+      />
     </Box>
   );
 };

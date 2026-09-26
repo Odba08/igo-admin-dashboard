@@ -47,6 +47,15 @@ export const updateUser = (id, data) => api.patch(`/users/${id}`, data);
 export const getOrders = () => api.get('/orders');
 export const getOrderById = (id) => api.get(`/orders/${id}`);
 export const updateOrder = (id, data) => api.patch(`/orders/${id}`, data);
+export const assignOrderDriver = (id, deliveryUserId) => api.patch(`/orders/${id}/assign-driver`, { deliveryUserId });
+export const verifyOrderPayment = (id, isPaid = true) => api.patch(`/orders/${id}/verify-payment`, { isPaid });
+export const getBusinessDebtsReport = () => api.get('/orders/reports/business-debts');
+
+// Menu Categories (Categorías internas de tienda)
+export const getMenuCategoriesByBusiness = (businessId) => api.get(`/menu-category/business/${businessId}`);
+export const createMenuCategory = (data) => api.post('/menu-category', data);
+export const updateMenuCategory = (id, data) => api.patch(`/menu-category/${id}`, data);
+export const deleteMenuCategory = (id) => api.delete(`/menu-category/${id}`);
 
 // Businesses & Products Services
 export const getBusinesses = () => api.get('/business');
