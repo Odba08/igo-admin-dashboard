@@ -2,15 +2,27 @@ import React, { useState, useEffect } from "react";
 import { 
   Box, Button, Typography, useTheme, Dialog, DialogTitle, 
   DialogContent, DialogActions, TextField, 
-  CircularProgress, Alert, IconButton, Switch, FormControlLabel
+  CircularProgress, Alert, IconButton, Switch, FormControlLabel,
+  MenuItem, Select, FormControl, InputLabel, Chip, List, ListItem, ListItemText, ListItemSecondaryAction, Divider
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CategoryIcon from "@mui/icons-material/Category";
 import Header from "../../components/Header";
-import { getBusinessProducts, createBusinessProduct, updateBusinessProduct, deleteBusinessProduct, getBusinessByOwner, uploadProductImage } from "../../services/api";
+import { 
+  getBusinessProducts, 
+  createBusinessProduct, 
+  updateBusinessProduct, 
+  deleteBusinessProduct, 
+  getBusinessByOwner, 
+  uploadProductImage,
+  getMenuCategoriesByBusiness,
+  createMenuCategory,
+  deleteMenuCategory
+} from "../../services/api";
 
 const BusinessProducts = () => {
   const theme = useTheme();
@@ -61,6 +73,13 @@ const BusinessProducts = () => {
   const [imageUrl, setImageUrl] = useState("");
   const [options, setOptions] = useState([]);
 
+  // Menu Categories (Categorías internas del comercio)
+  const [menuCategories, setMenuCategories] = useState([]);
+  const [menuCategoryId, setMenuCategoryId] = useState("");
+  const [openCategoriesModal, setOpenCategoriesModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryLoading, setCategoryLoading] = useState(false);
+
   const fetchProducts = async (targetId) => {
     const activeId = targetId || myBusinessId;
     if (!activeId) {
@@ -82,11 +101,63 @@ const BusinessProducts = () => {
     }
   };
 
+  const fetchMenuCategories = async (bizId) => {
+    const activeId = bizId || myBusinessId;
+    if (!activeId) {
+      setMenuCategories([]);
+      return;
+    }
+    try {
+      const res = await getMenuCategoriesByBusiness(activeId);
+      setMenuCategories(res.data || []);
+    } catch (err) {
+      console.error("Error fetching menu categories:", err);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    try {
+      setCategoryLoading(true);
+      setError("");
+      await createMenuCategory({
+        name: newCategoryName.trim(),
+        businessId: myBusinessId,
+      });
+      setNewCategoryName("");
+      await fetchMenuCategories(myBusinessId);
+      setSuccess("Categoría de menú agregada.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Error al crear la categoría de menú.");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (catId) => {
+    if (!window.confirm("¿Seguro que deseas eliminar esta categoría? Los productos asociados quedarán como generales.")) return;
+    try {
+      setCategoryLoading(true);
+      setError("");
+      await deleteMenuCategory(catId);
+      await fetchMenuCategories(myBusinessId);
+      await fetchProducts(myBusinessId);
+      setSuccess("Categoría eliminada.");
+    } catch (err) {
+      setError("Error al eliminar la categoría.");
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (myBusinessId) {
       fetchProducts(myBusinessId);
+      fetchMenuCategories(myBusinessId);
     } else {
       setProducts([]);
+      setMenuCategories([]);
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,6 +174,7 @@ const BusinessProducts = () => {
     setWeight(0);
     setTags("");
     setImageUrl("");
+    setMenuCategoryId("");
     setOptions([]);
     setOpenModal(true);
   };
@@ -117,6 +189,7 @@ const BusinessProducts = () => {
     setDiscountPrice(product.discountPrice || 0);
     setWeight(product.weight || 0);
     setTags(product.tags ? product.tags.join(", ") : "");
+    setMenuCategoryId(product.menuCategory?.id || "");
     if (product.images && product.images.length > 0) {
       // images can be strings or objects. The entity shows string[] in DTO, or string in entity relations.
       const firstImg = product.images[0];
@@ -157,6 +230,7 @@ const BusinessProducts = () => {
       weight: parseFloat(weight),
       tags: tagsArray,
       images: imagesArray,
+      menuCategoryId: menuCategoryId || undefined,
       options: options.map(opt => ({
         title: opt.title,
         isRequired: opt.isRequired || false,
@@ -186,6 +260,29 @@ const BusinessProducts = () => {
 
   const columns = [
     { field: "title", headerName: "Título del Producto", flex: 1.5, cellClassName: "name-column--cell" },
+    { 
+      field: "menuCategory", 
+      headerName: "Categoría Menú", 
+      flex: 1.2,
+      renderCell: (params) => {
+        const catName = params.row.menuCategory?.name;
+        return catName ? (
+          <Chip 
+            label={catName} 
+            size="small" 
+            sx={{ 
+              backgroundColor: colors.blueAccent[700], 
+              color: colors.grey[100], 
+              fontWeight: "bold" 
+            }} 
+          />
+        ) : (
+          <Typography variant="body2" color={colors.grey[400]}>
+            General
+          </Typography>
+        );
+      }
+    },
     { 
       field: "price", 
       headerName: "Precio Base", 
@@ -243,15 +340,30 @@ const BusinessProducts = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Header title="PRODUCTOS" subtitle="Administra el inventario de productos de tu comercio" />
         {myBusinessId && (
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<AddIcon />}
-            onClick={handleOpenCreate}
-            sx={{ backgroundColor: colors.greenAccent[500], color: "#000", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[600] } }}
-          >
-            Nuevo Producto
-          </Button>
+          <Box display="flex" gap="10px">
+            <Button
+              variant="contained"
+              startIcon={<CategoryIcon />}
+              onClick={() => setOpenCategoriesModal(true)}
+              sx={{ 
+                backgroundColor: colors.blueAccent[600], 
+                color: "#fff", 
+                fontWeight: "bold", 
+                "&:hover": { backgroundColor: colors.blueAccent[700] } 
+              }}
+            >
+              Categorías de Menú ({menuCategories.length})
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreate}
+              sx={{ backgroundColor: colors.greenAccent[500], color: "#000", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[600] } }}
+            >
+              Nuevo Producto
+            </Button>
+          </Box>
         )}
       </Box>
 
@@ -338,6 +450,33 @@ const BusinessProducts = () => {
                   <Typography variant="body2" color={colors.grey[300]}>Sin imagen de producto</Typography>
                 )}
               </Box>
+
+              <FormControl fullWidth sx={{ gridColumn: "span 2" }}>
+                <InputLabel id="menu-category-select-label" sx={{ color: colors.grey[100] }}>
+                  Categoría del Menú / Sección
+                </InputLabel>
+                <Select
+                  labelId="menu-category-select-label"
+                  value={menuCategoryId}
+                  onChange={(e) => setMenuCategoryId(e.target.value)}
+                  label="Categoría del Menú / Sección"
+                  sx={{
+                    color: colors.grey[100],
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: colors.grey[400],
+                    },
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Sin categoría específica (General)</em>
+                  </MenuItem>
+                  {menuCategories.map((cat) => (
+                    <MenuItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
               <TextField
                 label="Título del Producto"
@@ -600,6 +739,92 @@ const BusinessProducts = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      {/* Modal de Gestión de Categorías de Menú */}
+      <Dialog open={openCategoriesModal} onClose={() => setOpenCategoriesModal(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ backgroundColor: colors.primary[400], color: colors.grey[100], display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="h4" fontWeight="bold">
+            Categorías del Menú
+          </Typography>
+          <Chip label={`${menuCategories.length} creadas`} color="secondary" size="small" />
+        </DialogTitle>
+        <DialogContent sx={{ backgroundColor: colors.primary[400], pt: "10px" }}>
+          <Typography variant="body2" color={colors.grey[300]} mb={2}>
+            Crea secciones para organizar tus productos (ej: Hamburguesas, Bebidas, Postres, etc.). Los clientes en Igo Store podrán filtrar y ver los productos organizados por estas secciones.
+          </Typography>
+
+          {/* Formulario para agregar nueva categoría */}
+          <form onSubmit={handleCreateCategory} style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <TextField
+              label="Nueva Categoría (ej: Bebidas, Hamburguesas)"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              fullWidth
+              size="small"
+              disabled={categoryLoading}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={categoryLoading || !newCategoryName.trim()}
+              sx={{
+                backgroundColor: colors.greenAccent[500],
+                color: "#000",
+                fontWeight: "bold",
+                minWidth: "110px",
+                "&:hover": { backgroundColor: colors.greenAccent[600] }
+              }}
+            >
+              {categoryLoading ? <CircularProgress size={20} color="inherit" /> : "Agregar"}
+            </Button>
+          </form>
+
+          {/* Lista de categorías existentes */}
+          {menuCategories.length === 0 ? (
+            <Alert severity="info" sx={{ bgcolor: "#1f2a40", color: "#e0e0e0" }}>
+              Aún no tienes categorías en tu menú. Agrega la primera en el campo superior.
+            </Alert>
+          ) : (
+            <List sx={{ bgcolor: "rgba(255,255,255,0.02)", borderRadius: "8px", border: `1px solid ${colors.grey[700]}` }}>
+              {menuCategories.map((cat, index) => (
+                <React.Fragment key={cat.id}>
+                  <ListItem>
+                    <ListItemText
+                      primary={
+                        <Typography variant="h6" fontWeight="bold" color={colors.grey[100]}>
+                          {cat.name}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="caption" color={colors.grey[400]}>
+                          {products.filter(p => p.menuCategory?.id === cat.id).length} producto(s) en esta categoría
+                        </Typography>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDeleteCategory(cat.id)}
+                        disabled={categoryLoading}
+                        sx={{ color: colors.redAccent[500] }}
+                        title="Eliminar categoría"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {index < menuCategories.length - 1 && <Divider sx={{ borderColor: colors.grey[700] }} />}
+                </React.Fragment>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ backgroundColor: colors.primary[400], p: "15px 24px" }}>
+          <Button onClick={() => setOpenCategoriesModal(false)} variant="contained" sx={{ backgroundColor: colors.grey[700], color: "#fff" }}>
+            Cerrar
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
