@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   Box, Button, Typography, useTheme, Dialog, DialogTitle, 
-  DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel 
+  DialogContent, DialogActions, TextField, MenuItem, Select, FormControl, InputLabel,
+  Switch, FormControlLabel
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
@@ -81,7 +82,7 @@ const Team = () => {
   };
 
   const columns = [
-    { field: "id", headerName: "ID", flex: 1 },
+    { field: "id", headerName: "ID", flex: 0.8 },
     {
       field: "fullName",
       headerName: "Nombre Completo",
@@ -94,38 +95,66 @@ const Team = () => {
       flex: 1,
     },
     {
+      field: "isActive",
+      headerName: "Cuenta Habilitada",
+      flex: 1.2,
+      renderCell: ({ row }) => {
+        const isEnabled = row.isActive !== false;
+        return (
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={isEnabled}
+                onChange={async () => {
+                  try {
+                    await updateUser(row.id, { isActive: !isEnabled });
+                    fetchUsers();
+                  } catch (err) {
+                    alert("Error al actualizar estado: " + (err.response?.data?.message || err.message));
+                  }
+                }}
+                color="success"
+              />
+            }
+            label={
+              <Typography fontSize="12px" fontWeight="bold" color={isEnabled ? colors.greenAccent[400] : colors.grey[400]}>
+                {isEnabled ? "Habilitado" : "Inactivo"}
+              </Typography>
+            }
+          />
+        );
+      },
+    },
+    {
       field: "employeeStatus",
       headerName: "Estado de Servicio",
       flex: 1.5,
       renderCell: ({ row }) => {
         const currentStatus = row.employeeStatus || "inactive";
-        
-        let label = "Fuera de Servicio";
-        let dotColor = "#FF3B30"; // rojo
-        
-        if (currentStatus === "active") {
-          label = "Activo / Trabajando";
-          dotColor = "#4CD964"; // verde
-        } else if (currentStatus === "break") {
-          label = "De descanso";
-          dotColor = "#FFCC00"; // amarillo
-        }
-
         return (
-          <Box display="flex" alignItems="center" gap="10px">
-            <Box
-              width="10px"
-              height="10px"
-              borderRadius="50%"
-              backgroundColor={dotColor}
-            />
-            <Typography fontSize="13px" color={colors.grey[100]}>
-              {label}
-            </Typography>
-          </Box>
+          <Select
+            value={currentStatus}
+            onChange={async (e) => {
+              try {
+                await updateUser(row.id, { employeeStatus: e.target.value });
+                fetchUsers();
+              } catch (err) {
+                alert("Error al actualizar servicio: " + (err.response?.data?.message || err.message));
+              }
+            }}
+            size="small"
+            sx={{ fontSize: "12px", height: "30px", width: "100%", bgcolor: colors.primary[400] }}
+          >
+            <MenuItem value="active">🟢 Activo / Trabajando</MenuItem>
+            <MenuItem value="inactive">🔴 Fuera de Servicio</MenuItem>
+            <MenuItem value="break">🟡 De descanso</MenuItem>
+            <MenuItem value="busy">🟠 En Ruta / Ocupado</MenuItem>
+          </Select>
         );
-      }
+      },
     },
+
     {
       field: "vehicle",
       headerName: "Vehículo",

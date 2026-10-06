@@ -10,6 +10,7 @@ import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import ActiveDriversDrawer from "../../components/ActiveDriversDrawer";
 import PaymentVerificationModal from "../../components/PaymentVerificationModal";
+import OrderLocationMap from "../../components/OrderLocationMap";
 import { getOrders, updateOrder, getBusinesses, getUsers, uploadProductImage, assignOrderDriver, verifyOrderPayment, updateBusiness } from "../../services/api";
 import getSocket from "../../services/socket";
 
@@ -833,8 +834,8 @@ const Invoices = () => {
           }
           label={
             <Chip 
-              label={params.row.isPaid ? "Pagado" : "Pendiente"} 
-              color={params.row.isPaid ? "success" : "error"} 
+              label={params.row.isPaid ? "Pagado" : "En revisión"} 
+              color={params.row.isPaid ? "success" : "warning"} 
               size="small" 
             />
           }
@@ -1049,7 +1050,7 @@ const Invoices = () => {
                   >
                     <MenuItem value="ALL">Todos</MenuItem>
                     <MenuItem value="PAID">Pagado</MenuItem>
-                    <MenuItem value="UNPAID">No Pagado</MenuItem>
+                    <MenuItem value="UNPAID">En revisión</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -1494,8 +1495,27 @@ const Invoices = () => {
               </Select>
             </FormControl>
 
+            <Box gridColumn="span 2" mt={1}>
+              <Typography variant="h6" fontWeight="bold" color={colors.greenAccent[400]} mb={1}>
+                🗺️ Ubicación en Mapa (Arrastra el marcador o haz clic en el mapa para ajustar)
+              </Typography>
+              <OrderLocationMap
+                pickupLat={selectedOrder?.pickupLat || selectedOrder?.business?.latitude}
+                pickupLng={selectedOrder?.pickupLong || selectedOrder?.business?.longitude}
+                pickupAddress={selectedOrder?.pickupAddress || selectedOrder?.business?.address || selectedOrder?.business?.name}
+                deliveryLat={editLat}
+                deliveryLng={editLng}
+                deliveryAddress={editAddress}
+                isEditable={true}
+                onLocationChange={({ lat, lng }) => {
+                  setEditLat(lat);
+                  setEditLng(lng);
+                }}
+              />
+            </Box>
+
             <TextField
-              label="Latitud de Entrega"
+              label="Latitud de Entrega (Manual o vía Mapa)"
               type="number"
               value={editLat}
               onChange={(e) => setEditLat(parseFloat(e.target.value || 0))}
@@ -1503,7 +1523,7 @@ const Invoices = () => {
             />
 
             <TextField
-              label="Longitud de Entrega"
+              label="Longitud de Entrega (Manual o vía Mapa)"
               type="number"
               value={editLng}
               onChange={(e) => setEditLng(parseFloat(e.target.value || 0))}
@@ -1572,13 +1592,29 @@ const Invoices = () => {
                 <Typography variant="body1" sx={{ mb: 1 }}>
                   <strong>Dirección de Envío:</strong> {infoOrder.deliveryAddress || "N/A"}
                 </Typography>
-                <Box display="grid" gridTemplateColumns="repeat(3, 1fr)" gap="15px">
+                <Box display="grid" gridTemplateColumns="repeat(3, 1fr)" gap="15px" mb="15px">
                   <Typography variant="body1"><strong>Despacho en:</strong> {infoOrder.shippingType || "Moto"}</Typography>
                   <Typography variant="body1"><strong>Estado Logístico:</strong> {infoOrder.status}</Typography>
-                  <Typography variant="body1"><strong>Estado Pago:</strong> {infoOrder.isPaid ? "PAGADO" : "PENDIENTE"}</Typography>
+                  <Typography variant="body1"><strong>Estado Pago:</strong> {infoOrder.isPaid ? "PAGADO" : "EN REVISIÓN"}</Typography>
                   <Typography variant="body1"><strong>Distancia Ruta:</strong> {infoOrder.distance || "N/A"}</Typography>
                   <Typography variant="body1"><strong>Coordenadas GPS:</strong> Lat: {infoOrder.deliveryLat}, Lng: {infoOrder.deliveryLong}</Typography>
                   <Typography variant="body1"><strong>Motorizado:</strong> {infoOrder.deliveryUser?.fullName || "No asignado / Disponible"}</Typography>
+                </Box>
+                
+                {/* Mapa con Ruta y Repartidores */}
+                <Box mt={2}>
+                  <Typography variant="body2" fontWeight="bold" color={colors.grey[300]} mb={1}>
+                    🗺️ Mapa de Despacho y Repartidores Activos:
+                  </Typography>
+                  <OrderLocationMap
+                    pickupLat={infoOrder.pickupLat || infoOrder.business?.latitude}
+                    pickupLng={infoOrder.pickupLong || infoOrder.business?.longitude}
+                    pickupAddress={infoOrder.pickupAddress || infoOrder.business?.address || infoOrder.business?.name}
+                    deliveryLat={infoOrder.deliveryLat}
+                    deliveryLng={infoOrder.deliveryLong}
+                    deliveryAddress={infoOrder.deliveryAddress}
+                    isEditable={false}
+                  />
                 </Box>
               </Paper>
 

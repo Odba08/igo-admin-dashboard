@@ -4,8 +4,9 @@ import {
 } from "@mui/material";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
-import { updateUser, getOrders, uploadUserImage } from "../../services/api";
+import { updateUser, getOrders, uploadUserImage, getSetting } from "../../services/api";
 import BadgeIcon from "@mui/icons-material/Badge";
+
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
@@ -28,6 +29,7 @@ const UserProfile = () => {
   const [myDeliveries, setMyDeliveries] = useState([]);
   const [loadingStats, setLoadingStats] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [driverCommissionPercent, setDriverCommissionPercent] = useState(80);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -64,9 +66,17 @@ const UserProfile = () => {
     if (!isEmployee || !userId) return;
     try {
       setLoadingStats(true);
-      const res = await getOrders();
-      const completed = res.data.filter(o => o.deliveryUser?.id === userId && o.status === "DELIVERED");
-      setMyDeliveries(completed);
+      const [ordersRes, commRes] = await Promise.allSettled([
+        getOrders(),
+        getSetting("COMMISSION_DRIVER"),
+      ]);
+      if (ordersRes.status === "fulfilled") {
+        const completed = (ordersRes.value.data || []).filter(o => o.deliveryUser?.id === userId && o.status === "DELIVERED");
+        setMyDeliveries(completed);
+      }
+      if (commRes.status === "fulfilled" && commRes.value.data?.value) {
+        setDriverCommissionPercent(parseFloat(commRes.value.data.value) || 80);
+      }
     } catch (err) {
       console.error("Error loading delivery stats:", err);
     } finally {
@@ -152,9 +162,10 @@ const UserProfile = () => {
     return true;
   });
 
-  // Calculate earnings as 50% of the delivery fees
+  // Calculate earnings with dynamic commission percent
   const totalDeliveryFee = filteredDeliveries.reduce((sum, o) => sum + (parseFloat(o.deliveryFee) || 0), 0);
-  const totalEarnings = totalDeliveryFee * 0.50;
+  const commissionRate = (driverCommissionPercent || 80) / 100;
+  const totalEarnings = totalDeliveryFee * commissionRate;
 
   const handlePrintEmployeePDF = () => {
     const printWindow = window.open("", "_blank");
@@ -208,7 +219,7 @@ const UserProfile = () => {
                 <th>Comercio</th>
                 <th>Dirección de Destino</th>
                 <th>Tipo Envío</th>
-                <th>Mi Ganancia (50%)</th>
+                <th>Mi Ganancia (${driverCommissionPercent}%)</th>
               </tr>
             </thead>
             <tbody>
@@ -219,7 +230,7 @@ const UserProfile = () => {
                   <td>${o.business?.name || 'Servicio IGO (Favor/Taxi)'}</td>
                   <td>${o.deliveryAddress}</td>
                   <td>${o.shippingType || 'Moto'}</td>
-                  <td>$${((o.deliveryFee || 0) * 0.50).toFixed(2)}</td>
+                  <td>$${((o.deliveryFee || 0) * commissionRate).toFixed(2)}</td>
                 </tr>
               `).join('')}
               ${filteredDeliveries.length === 0 ? `
@@ -426,7 +437,7 @@ const UserProfile = () => {
                 border={`1px solid ${colors.grey[600]}`}
               >
                 <MonetizationOnIcon sx={{ fontSize: 32, color: colors.greenAccent[500], mb: 1 }} />
-                <Typography color={colors.grey[300]} variant="h6">Mis Ganancias Estimadas (50%)</Typography>
+                <Typography color={colors.grey[300]} variant="h6">Mis Ganancias Estimadas ({driverCommissionPercent}%)</Typography>
                 <Typography variant="h3" fontWeight="bold" color={colors.greenAccent[500]} sx={{ mt: 1 }}>
                   ${totalEarnings.toFixed(2)}
                 </Typography>
@@ -442,7 +453,7 @@ const UserProfile = () => {
                     <TableCell style={{ backgroundColor: colors.primary[500], color: colors.grey[100] }}>Fecha</TableCell>
                     <TableCell style={{ backgroundColor: colors.primary[500], color: colors.grey[100] }}>Comercio</TableCell>
                     <TableCell style={{ backgroundColor: colors.primary[500], color: colors.grey[100] }}>Destino</TableCell>
-                    <TableCell style={{ backgroundColor: colors.primary[500], color: colors.grey[100] }}>Mi Ganancia (50%)</TableCell>
+                    <TableCell style={{ backgroundColor: colors.primary[500], color: colors.grey[100] }}>Mi Ganancia ({driverCommissionPercent}%)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -452,9 +463,10 @@ const UserProfile = () => {
                       <TableCell>{new Date(delivery.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell>{delivery.business?.name || "Servicio IGO (Favor/Taxi)"}</TableCell>
                       <TableCell>{delivery.deliveryAddress}</TableCell>
-                      <TableCell color={colors.greenAccent[500]}>${((delivery.deliveryFee || 0) * 0.50).toFixed(2)}</TableCell>
+                      <TableCell color={colors.greenAccent[500]}>${((delivery.deliveryFee || 0) * commissionRate).toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
+
                   {filteredDeliveries.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} align="center" style={{ fontStyle: "italic", padding: "20px" }}>

@@ -15,8 +15,8 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import PaymentIcon from "@mui/icons-material/Payment";
 import StorefrontIcon from "@mui/icons-material/Storefront";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import { tokens } from "../theme";
+import OrderLocationMap from "./OrderLocationMap";
 
 export default function PaymentVerificationModal({
   open,
@@ -33,11 +33,15 @@ export default function PaymentVerificationModal({
   const itemsAmount = parseFloat(order.totalItems || 0).toFixed(2);
   const deliveryFee = parseFloat(order.deliveryFee || 0).toFixed(2);
 
+  const pickupLat = order.pickupLat || order.business?.latitude;
+  const pickupLng = order.pickupLong || order.business?.longitude;
+  const pickupAddress = order.pickupAddress || order.business?.address || order.business?.name;
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
@@ -169,19 +173,19 @@ export default function PaymentVerificationModal({
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
-                  maxHeight: "420px",
+                  maxHeight: "360px",
                 }}
               >
                 <img
                   src={order.paymentCaptureUrl}
                   alt="Capture de Pago Móvil"
-                  style={{ width: "100%", maxHeight: "420px", objectFit: "contain" }}
+                  style={{ width: "100%", maxHeight: "360px", objectFit: "contain" }}
                 />
               </Box>
             ) : (
               <Box
                 sx={{
-                  height: "250px",
+                  height: "220px",
                   borderRadius: "8px",
                   border: "2px dashed rgba(255,255,255,0.2)",
                   display: "flex",
@@ -210,6 +214,22 @@ export default function PaymentVerificationModal({
             )}
           </Box>
         </Box>
+
+        {/* Sección de Mapa y Ruta en Tiempo Real */}
+        <Box mt={3}>
+          <Typography variant="h5" fontWeight="bold" color={colors.grey[100]} mb={1}>
+            🗺️ Ubicación, Ruta y Repartidores Cercanos
+          </Typography>
+          <OrderLocationMap
+            pickupLat={pickupLat}
+            pickupLng={pickupLng}
+            pickupAddress={pickupAddress}
+            deliveryLat={order.deliveryLat}
+            deliveryLng={order.deliveryLong}
+            deliveryAddress={order.deliveryAddress}
+            isEditable={false}
+          />
+        </Box>
       </DialogContent>
 
       <DialogActions sx={{ p: "20px", borderTop: `1px solid ${colors.grey[700]}`, gap: "10px" }}>
@@ -224,7 +244,7 @@ export default function PaymentVerificationModal({
           onClick={() => onVerifyPayment(order.id, false)}
           sx={{ fontWeight: "bold" }}
         >
-          Rechazar / No Pagado
+          Dejar en revisión / Rechazar
         </Button>
 
         <Button

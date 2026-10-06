@@ -73,8 +73,12 @@ export const deleteBusiness = (businessId) => api.delete(`/business/${businessId
 export const deleteUser = (id) => api.delete(`/users/${id}`);
 
 // Settings Services
+export const getAllSettings = () => api.get('/settings');
 export const getSetting = (key) => api.get(`/settings/${key}`);
 export const updateSetting = (key, value) => api.patch(`/settings/${key}`, { value });
+export const updateBulkSettings = (settings) => api.post('/settings/bulk', settings);
+export const getActiveDrivers = () => api.get('/orders/active-drivers');
+
 
 // Image Upload Services
 const uploadToImgBBDirect = async (formData) => {

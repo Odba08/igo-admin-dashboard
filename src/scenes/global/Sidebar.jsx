@@ -15,6 +15,8 @@ import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
@@ -237,6 +239,21 @@ const Sidebar = ({ user }) => {
                   color={colors.grey[300]}
                   sx={{ m: "15px 0 5px 20px" }}
                 >
+                  Configuración
+                </Typography>
+                <Item
+                  title="Configuración y Tarifas"
+                  to="/settings"
+                  icon={<SettingsOutlinedIcon />}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+
+                <Typography
+                  variant="h6"
+                  color={colors.grey[300]}
+                  sx={{ m: "15px 0 5px 20px" }}
+                >
                   Geolocalización
                 </Typography>
                 <Item
@@ -246,6 +263,7 @@ const Sidebar = ({ user }) => {
                   selected={selected}
                   setSelected={setSelected}
                 />
+
               </>
             )}
 

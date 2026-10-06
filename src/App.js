@@ -16,6 +16,8 @@ import Login from "./scenes/login";
 import BusinessManage from "./scenes/business";
 import BusinessProducts from "./scenes/business-products";
 import UserProfile from "./scenes/profile";
+import Settings from "./scenes/settings";
+
 
 function App() {
   const [theme, colorMode] = useMode();
@@ -128,7 +130,9 @@ function App() {
                   <Route path="/my-business" element={<BusinessManage />} />
                   <Route path="/my-products" element={<BusinessProducts />} />
                   <Route path="/my-profile" element={<UserProfile />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" />} />
+
                 </>
               )}
               {isBusiness && (
