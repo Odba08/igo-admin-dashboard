@@ -17,6 +17,7 @@ import BusinessManage from "./scenes/business";
 import BusinessProducts from "./scenes/business-products";
 import UserProfile from "./scenes/profile";
 import Settings from "./scenes/settings";
+import ServicesOrders from "./scenes/services-orders";
 
 
 function App() {
@@ -122,6 +123,7 @@ function App() {
                   <Route path="/team" element={<Team />} />
                   <Route path="/contacts" element={<Contacts />} />
                   <Route path="/invoices" element={<Invoices />} />
+                  <Route path="/services-orders" element={<ServicesOrders />} />
                   <Route path="/form" element={<Form />} />
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/calendar" element={<Calendar />} />

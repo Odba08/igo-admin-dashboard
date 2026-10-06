@@ -16,6 +16,7 @@ import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
 
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
@@ -186,6 +187,13 @@ const Sidebar = ({ user }) => {
                   title="Pedidos y Facturas"
                   to="/invoices"
                   icon={<ReceiptOutlinedIcon />}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
+                  title="IGO Favor y Taxi"
+                  to="/services-orders"
+                  icon={<TwoWheelerOutlinedIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />
