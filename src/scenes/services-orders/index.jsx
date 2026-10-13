@@ -48,7 +48,6 @@ import NearMeIcon from "@mui/icons-material/NearMe";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import ChatIcon from "@mui/icons-material/Chat";
-import StarIcon from "@mui/icons-material/Star";
 
 export default function ServicesOrders() {
   const theme = useTheme();
@@ -83,8 +82,8 @@ export default function ServicesOrders() {
   const [selectedChatOrder, setSelectedChatOrder] = useState(null);
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState("ALL");
-  const [filterPayment, setFilterPayment] = useState("ALL");
+  const [filterStatus] = useState("ALL");
+  const [filterPayment] = useState("ALL");
 
   const playChimeSound = () => {
     try {

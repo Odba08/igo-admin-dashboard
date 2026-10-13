@@ -7,7 +7,6 @@ import {
   Button,
   Typography,
   Box,
-  Divider,
 } from "@mui/material";
 import ChatIcon from "@mui/icons-material/Chat";
 
