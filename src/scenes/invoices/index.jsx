@@ -11,6 +11,8 @@ import Header from "../../components/Header";
 import ActiveDriversDrawer from "../../components/ActiveDriversDrawer";
 import PaymentVerificationModal from "../../components/PaymentVerificationModal";
 import OrderLocationMap from "../../components/OrderLocationMap";
+import SupportTicketModal from "../../components/SupportTicketModal";
+import OrderChatViewerModal from "../../components/OrderChatViewerModal";
 import { getOrders, updateOrder, getBusinesses, getUsers, uploadProductImage, assignOrderDriver, verifyOrderPayment, updateBusiness } from "../../services/api";
 import getSocket from "../../services/socket";
 
@@ -30,6 +32,8 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import TwoWheelerIcon from "@mui/icons-material/TwoWheeler";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ChatIcon from "@mui/icons-material/Chat";
+import StarIcon from "@mui/icons-material/Star";
 
 const Invoices = () => {
   const theme = useTheme();
@@ -49,6 +53,12 @@ const Invoices = () => {
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState(null);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [verifyOrder, setVerifyOrder] = useState(null);
+
+  // States for Support Tickets & Chat Modals
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [selectedTicketOrder, setSelectedTicketOrder] = useState(null);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [selectedChatOrder, setSelectedChatOrder] = useState(null);
 
   // States for Edit Order Modal
   const [editOpen, setEditOpen] = useState(false);
@@ -140,6 +150,25 @@ const Invoices = () => {
     } catch (e) {
       console.log("Audio not enabled yet", e);
     }
+  };
+
+  const playEmergencyAlertSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } catch (e) {}
   };
 
   const exportOrdersToCSV = (ordersList, fileName = "pedidos_igostore.csv") => {
@@ -258,6 +287,12 @@ const Invoices = () => {
       socket.on("order:payment_verified", () => {
         fetchOrders();
       });
+
+      socket.on("order:issue_reported", (data) => {
+        console.warn("⚠️ ALERTA: Problema reportado en orden", data);
+        fetchOrders();
+        playEmergencyAlertSound();
+      });
     }
 
     const interval = setInterval(fetchOrders, 10000); // Polling de respaldo cada 10s
@@ -267,6 +302,7 @@ const Invoices = () => {
         socket.off("order:created");
         socket.off("order:updated");
         socket.off("order:payment_verified");
+        socket.off("order:issue_reported");
       }
     };
   }, [soundAlertEnabled]);
@@ -863,11 +899,87 @@ const Invoices = () => {
       )
     },
     {
+      field: "supportTicket",
+      headerName: "Reclamo / Soporte",
+      width: 170,
+      renderCell: (params) => {
+        const status = params.row.supportTicketStatus;
+        if (!status) return null;
+        const isResolved = status === "RESOLVED";
+        return (
+          <Button
+            variant={isResolved ? "outlined" : "contained"}
+            color={isResolved ? "success" : "error"}
+            size="small"
+            onClick={() => {
+              setSelectedTicketOrder(params.row);
+              setTicketModalOpen(true);
+            }}
+            sx={{
+              fontSize: "10px",
+              fontWeight: "bold",
+              py: "2px",
+              px: "8px",
+              borderRadius: "12px",
+              textTransform: "none",
+              boxShadow: isResolved ? "none" : "0 0 8px rgba(239, 68, 68, 0.6)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isResolved ? "✅ Caso Resuelto" : `🚨 ${params.row.supportTicketReason || "Problema"}`}
+          </Button>
+        );
+      },
+    },
+    {
+      field: "ratings",
+      headerName: "Calificación",
+      width: 130,
+      renderCell: (params) => {
+        if (!params.row.businessRating) {
+          return <Typography variant="caption" color="text.secondary">Sin calificar</Typography>;
+        }
+        return (
+          <Box display="flex" alignItems="center" gap="4px">
+            <StarIcon sx={{ color: "#F59E0B", fontSize: "16px" }} />
+            <Typography variant="body2" fontWeight="bold" color="#F59E0B">
+              {params.row.businessRating}/5
+            </Typography>
+            {params.row.driverRating && (
+              <Typography variant="caption" color={colors.grey[300]}>
+                (🛵 {params.row.driverRating}★)
+              </Typography>
+            )}
+          </Box>
+        );
+      },
+    },
+    {
       field: "actions",
       headerName: "Acciones",
-      width: 290,
+      width: 320,
       renderCell: (params) => (
         <Box display="flex" gap="6px" alignItems="center">
+          {/* Botón de Chat con Repartidor / Cliente */}
+          <Button
+            variant="outlined"
+            color={params.row.chatMessages && params.row.chatMessages.length > 0 ? "info" : "inherit"}
+            size="small"
+            onClick={() => {
+              setSelectedChatOrder(params.row);
+              setChatModalOpen(true);
+            }}
+            sx={{
+              fontSize: "10px",
+              py: "2px",
+              px: "6px",
+              minWidth: "30px",
+              textTransform: "none",
+              fontWeight: "bold",
+            }}
+          >
+            💬 {params.row.chatMessages?.length || 0}
+          </Button>
           {/* Botón de Verificación de Pago y Capture */}
           <Button
             variant={params.row.isPaid ? "outlined" : "contained"}
@@ -959,6 +1071,22 @@ const Invoices = () => {
       {activeTab === 0 ? (
         // PANEL 1: GESTIÓN DE PEDIDOS
         <Box m="20px 0 0 0">
+          {/* Banner de Alerta de Reclamos Pendientes */}
+          {orders.filter((o) => o.supportTicketStatus && o.supportTicketStatus !== "RESOLVED").length > 0 && (
+            <Alert
+              severity="error"
+              sx={{
+                mb: 2,
+                fontWeight: "bold",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid #EF4444",
+                alignItems: "center",
+              }}
+            >
+              🚨 ¡ATENCIÓN! Hay {orders.filter((o) => o.supportTicketStatus && o.supportTicketStatus !== "RESOLVED").length} reporte(s) de problemas o reclamos activos pendientes de atención.
+            </Alert>
+          )}
+
           {/* Barra de Filtros de Pedidos */}
           <Card sx={{ backgroundColor: colors.primary[400], mb: "15px", p: "15px", border: `1px solid ${colors.grey[700]}` }}>
             <CardContent sx={{ p: "12px !important" }}>
@@ -1826,6 +1954,27 @@ const Invoices = () => {
         onClose={() => setVerifyModalOpen(false)}
         order={verifyOrder}
         onVerifyPayment={handleVerifyPaymentDirect}
+      />
+
+      {/* Modal de Reclamo / Soporte al Cliente */}
+      <SupportTicketModal
+        open={ticketModalOpen}
+        onClose={() => setTicketModalOpen(false)}
+        order={selectedTicketOrder}
+        onResolved={() => {
+          fetchOrders();
+        }}
+        onOpenChat={(ord) => {
+          setSelectedChatOrder(ord);
+          setChatModalOpen(true);
+        }}
+      />
+
+      {/* Modal de Visor de Chat en Vivo */}
+      <OrderChatViewerModal
+        open={chatModalOpen}
+        onClose={() => setChatModalOpen(false)}
+        order={selectedChatOrder}
       />
     </Box>
   );

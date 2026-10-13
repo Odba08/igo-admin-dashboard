@@ -25,6 +25,8 @@ import Header from "../../components/Header";
 import ActiveDriversDrawer from "../../components/ActiveDriversDrawer";
 import PaymentVerificationModal from "../../components/PaymentVerificationModal";
 import OrderLocationMap from "../../components/OrderLocationMap";
+import SupportTicketModal from "../../components/SupportTicketModal";
+import OrderChatViewerModal from "../../components/OrderChatViewerModal";
 import {
   getOrders,
   updateOrder,
@@ -45,6 +47,8 @@ import InfoIcon from "@mui/icons-material/Info";
 import NearMeIcon from "@mui/icons-material/NearMe";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+import ChatIcon from "@mui/icons-material/Chat";
+import StarIcon from "@mui/icons-material/Star";
 
 export default function ServicesOrders() {
   const theme = useTheme();
@@ -71,6 +75,12 @@ export default function ServicesOrders() {
 
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [infoOrder, setInfoOrder] = useState(null);
+
+  // States for Support Tickets & Chat Modals
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [selectedTicketOrder, setSelectedTicketOrder] = useState(null);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [selectedChatOrder, setSelectedChatOrder] = useState(null);
 
   // Filters
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -169,6 +179,11 @@ export default function ServicesOrders() {
       socket.on("order:payment_verified", () => {
         fetchServicesOrders();
       });
+
+      socket.on("order:issue_reported", () => {
+        fetchServicesOrders();
+        playChimeSound();
+      });
     }
 
     const interval = setInterval(fetchServicesOrders, 8000);
@@ -178,6 +193,7 @@ export default function ServicesOrders() {
         socket.off("order:created");
         socket.off("order:updated");
         socket.off("order:payment_verified");
+        socket.off("order:issue_reported");
       }
     };
   }, [soundAlertEnabled]);
@@ -450,11 +466,54 @@ export default function ServicesOrders() {
       ),
     },
     {
+      field: "supportTicket",
+      headerName: "Reclamo",
+      width: 140,
+      renderCell: (params) => {
+        const status = params.row.supportTicketStatus;
+        if (!status) return null;
+        const isResolved = status === "RESOLVED";
+        return (
+          <Button
+            variant={isResolved ? "outlined" : "contained"}
+            color={isResolved ? "success" : "error"}
+            size="small"
+            onClick={() => {
+              setSelectedTicketOrder(params.row);
+              setTicketModalOpen(true);
+            }}
+            sx={{
+              fontSize: "10px",
+              fontWeight: "bold",
+              py: "2px",
+              px: "6px",
+              borderRadius: "12px",
+              textTransform: "none",
+            }}
+          >
+            {isResolved ? "✅ Resuelto" : "🚨 Reclamo"}
+          </Button>
+        );
+      },
+    },
+    {
       field: "actions",
-      headerName: "Mapa & Detalle",
-      width: 130,
+      headerName: "Acciones",
+      width: 160,
       renderCell: (params) => (
-        <Box display="flex" gap="4px">
+        <Box display="flex" gap="4px" alignItems="center">
+          <Tooltip title="Ver Chat en Vivo">
+            <IconButton
+              size="small"
+              onClick={() => {
+                setSelectedChatOrder(params.row);
+                setChatModalOpen(true);
+              }}
+              sx={{ color: params.row.chatMessages?.length > 0 ? colors.blueAccent[400] : colors.grey[400] }}
+            >
+              <ChatIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Ver mapa y ruta en vivo">
             <IconButton
               size="small"
@@ -730,6 +789,27 @@ export default function ServicesOrders() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de Reclamo / Soporte al Cliente */}
+      <SupportTicketModal
+        open={ticketModalOpen}
+        onClose={() => setTicketModalOpen(false)}
+        order={selectedTicketOrder}
+        onResolved={() => {
+          fetchServicesOrders();
+        }}
+        onOpenChat={(ord) => {
+          setSelectedChatOrder(ord);
+          setChatModalOpen(true);
+        }}
+      />
+
+      {/* Modal de Visor de Chat en Vivo */}
+      <OrderChatViewerModal
+        open={chatModalOpen}
+        onClose={() => setChatModalOpen(false)}
+        order={selectedChatOrder}
+      />
     </Box>
   );
 }

@@ -78,6 +78,10 @@ const BusinessManage = () => {
   const [ownerId, setOwnerId] = useState("");
   const [commissionPercentage, setCommissionPercentage] = useState(10);
   const [isActive, setIsActive] = useState(true);
+  const [freeDeliveryAbove, setFreeDeliveryAbove] = useState("");
+  const [isOfficialStore, setIsOfficialStore] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [reviewsCount, setReviewsCount] = useState(0);
 
   // Pago Móvil fields
   const [paymentBank, setPaymentBank] = useState("0102 - Banco de Venezuela");
@@ -171,6 +175,10 @@ const BusinessManage = () => {
     setOwnerId(biz.ownerId || "");
     setCommissionPercentage(biz.commissionPercentage !== undefined ? biz.commissionPercentage : 10);
     setIsActive(biz.isActive !== undefined ? biz.isActive : true);
+    setFreeDeliveryAbove(biz.freeDeliveryAbove !== undefined && biz.freeDeliveryAbove !== null ? biz.freeDeliveryAbove : "");
+    setIsOfficialStore(!!biz.isOfficialStore);
+    setRating(biz.rating !== undefined ? parseFloat(biz.rating) : 5);
+    setReviewsCount(biz.reviewsCount !== undefined ? parseInt(biz.reviewsCount, 10) : 0);
 
     setPaymentBank(biz.paymentBank || "0102 - Banco de Venezuela");
     setPaymentPhone(biz.paymentPhone || "");
@@ -213,6 +221,8 @@ const BusinessManage = () => {
       ownerId: ownerId || null,
       commissionPercentage: parseFloat(commissionPercentage),
       isActive,
+      freeDeliveryAbove: freeDeliveryAbove !== "" ? parseFloat(freeDeliveryAbove) : null,
+      isOfficialStore,
       paymentBank,
       paymentPhone,
       paymentId,
@@ -382,6 +392,24 @@ const BusinessManage = () => {
                 <Divider sx={{ mb: 2, borderColor: "rgba(255,255,255,0.1)" }} />
               </Box>
 
+              {businessId && (
+                <Box sx={{ gridColumn: "span 2", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(255, 219, 88, 0.12)", p: "12px 18px", borderRadius: "10px", border: "1px solid #FFDB58" }}>
+                  <Box display="flex" alignItems="center" gap="8px">
+                    <Typography variant="h6" fontWeight="bold" color="#EDB422">
+                      ⭐ Calificación Promedio: {Number(rating).toFixed(1)} / 5.0
+                    </Typography>
+                    <Typography variant="body2" color={colors.grey[300]}>
+                      ({reviewsCount} valoraciones de clientes)
+                    </Typography>
+                  </Box>
+                  {isOfficialStore && (
+                    <Box sx={{ bgcolor: "#EDB422", color: "#000", px: "10px", py: "3px", borderRadius: "12px", fontWeight: "bold", fontSize: "0.75rem" }}>
+                      TIENDA OFICIAL IGO
+                    </Box>
+                  )}
+                </Box>
+              )}
+
               <TextField
                 label="Nombre Comercial (Visible para clientes)"
                 value={name}
@@ -441,6 +469,39 @@ const BusinessManage = () => {
                   </Select>
                 </FormControl>
               )}
+
+              {/* REGLAS DE DELIVERY GRATIS Y TIENDA OFICIAL */}
+              <TextField
+                label="Envío Gratis para Pedidos Superiores a ($ USD)"
+                type="number"
+                value={freeDeliveryAbove}
+                onChange={(e) => setFreeDeliveryAbove(e.target.value)}
+                placeholder="Ej: 15.00"
+                helperText="Si el carrito del cliente supera este monto, el delivery será $0.00 GRATIS (Dejar vacío si no aplica)"
+                fullWidth
+              />
+
+              <Box display="flex" alignItems="center">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isOfficialStore}
+                      onChange={(e) => setIsOfficialStore(e.target.checked)}
+                      color="warning"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography fontWeight="bold" color={isOfficialStore ? "#EDB422" : colors.grey[300]}>
+                        {isOfficialStore ? "⭐ Tienda Oficial IGO (Destacada)" : "Tienda Estándar"}
+                      </Typography>
+                      <Typography variant="caption" color={colors.grey[400]}>
+                        {isOfficialStore ? "Esta tienda vende productos oficiales de la marca IGO" : "Comercio aliado general"}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
 
               {/* SECCIÓN 2: DATOS DE PAGO MÓVIL DIRECTO */}
               <Box sx={{ gridColumn: "span 2", mt: 2 }}>
