@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Box, Button, TextField, Typography, useTheme, Paper, Alert, InputAdornment, IconButton } from "@mui/material";
 import { Visibility, VisibilityOff, LockOutlined, EmailOutlined } from "@mui/icons-material";
 import { tokens } from "../../theme";
-import { loginAdmin } from "../../services/api";
+import { loginAdmin, API_URL } from "../../services/api";
 
 const Login = ({ onLoginSuccess }) => {
   const theme = useTheme();
@@ -31,7 +31,7 @@ const Login = ({ onLoginSuccess }) => {
       }
     } catch (err) {
       console.error("Login failed:", err);
-      const errMsg = err.response?.data?.message || "Credenciales inválidas o error de conexión";
+      const errMsg = err.response?.data?.message || "Credenciales inválidas o error de conexión con el backend";
       setError(Array.isArray(errMsg) ? errMsg[0] : errMsg);
     } finally {
       setLoading(false);
@@ -74,11 +74,16 @@ const Login = ({ onLoginSuccess }) => {
             <LockOutlined sx={{ color: "#000000", fontSize: "28px" }} />
           </Box>
           <Typography variant="h3" color={colors.grey[100]} fontWeight="bold" align="center">
-            INGÖ STORE
+            IGO STORE
           </Typography>
           <Typography variant="h6" color={colors.greenAccent[500]} sx={{ mt: "5px" }}>
             Panel de Administración
           </Typography>
+          <Box sx={{ mt: 1, bgcolor: "rgba(255,255,255,0.06)", px: 1.5, py: 0.5, borderRadius: "6px" }}>
+            <Typography variant="caption" color={colors.grey[400]}>
+              Servidor: <span style={{ color: "#4cceac", fontWeight: "bold" }}>{API_URL}</span>
+            </Typography>
+          </Box>
         </Box>
 
         <form onSubmit={handleLogin}>
