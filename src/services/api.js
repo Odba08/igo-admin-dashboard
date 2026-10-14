@@ -52,6 +52,7 @@ export const updateOrder = (id, data) => api.patch(`/orders/${id}`, data);
 export const assignOrderDriver = (id, deliveryUserId) => api.patch(`/orders/${id}/assign-driver`, { deliveryUserId });
 export const verifyOrderPayment = (id, isPaid = true) => api.patch(`/orders/${id}/verify-payment`, { isPaid });
 export const getBusinessDebtsReport = () => api.get('/orders/reports/business-debts');
+export const sendOrderChatMessage = (orderId, messageData) => api.post(`/orders/${orderId}/chat`, messageData);
 
 // Menu Categories (Categorías internas de tienda)
 export const getMenuCategoriesByBusiness = (businessId) => api.get(`/menu-category/business/${businessId}`);
