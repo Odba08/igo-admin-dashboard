@@ -299,6 +299,7 @@ const Invoices = () => {
         socket.off("order:issue_reported");
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soundAlertEnabled]);
 
   // Update commission estimate when business selection changes

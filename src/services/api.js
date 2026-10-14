@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const rawEnv = (process.env.REACT_APP_API_URL || '').trim();
-const rawUrl = rawEnv || 'http://localhost:3000/api';
+const rawUrl = rawEnv || 'https://igoback.onrender.com/api';
 export const API_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl}/api`;
 console.log('⚡ [Panel Admin] Conectando API a:', API_URL);
 

@@ -195,6 +195,7 @@ export default function ServicesOrders() {
         socket.off("order:issue_reported");
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [soundAlertEnabled]);
 
   const handleDriverAssign = async (orderId, deliveryUserId) => {

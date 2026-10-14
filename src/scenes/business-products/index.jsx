@@ -81,6 +81,7 @@ const BusinessProducts = () => {
       }
     };
     resolveBusiness();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isBusiness, isAdmin]);
   
   // Modal state
