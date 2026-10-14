@@ -19,6 +19,9 @@ import {
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import MapPicker from "../../components/MapPicker";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import AddIcon from "@mui/icons-material/Add";
+import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import {
   getBusinesses,
   createBusiness,
@@ -50,12 +53,16 @@ const VENEZUELAN_BANKS = [
 const BusinessManage = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlOwnerId = searchParams.get("ownerId");
+  const urlBusinessId = searchParams.get("businessId");
 
   const user = JSON.parse(localStorage.getItem("user"));
   const userId = user?.id || "default";
   const storageKey = `myBusinessId_${userId}`;
 
-  const [businessId, setBusinessId] = useState(localStorage.getItem(storageKey) || "");
+  const [businessId, setBusinessId] = useState(urlBusinessId || localStorage.getItem(storageKey) || "");
   const [businessesList, setBusinessesList] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
@@ -75,7 +82,7 @@ const BusinessManage = () => {
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("22:00");
   const [imageUrl, setImageUrl] = useState("");
-  const [ownerId, setOwnerId] = useState("");
+  const [ownerId, setOwnerId] = useState(urlOwnerId || "");
   const [commissionPercentage, setCommissionPercentage] = useState(10);
   const [isActive, setIsActive] = useState(true);
   const [freeDeliveryAbove, setFreeDeliveryAbove] = useState("");
@@ -113,56 +120,6 @@ const BusinessManage = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [catsRes] = await Promise.all([
-          getCategories().catch(() => ({ data: [] })),
-        ]);
-
-        setCategories(catsRes.data);
-
-        if (isBusiness) {
-          const ownerBizRes = await getBusinessByOwner(user.id).catch(() => null);
-          if (ownerBizRes && ownerBizRes.data) {
-            const biz = ownerBizRes.data;
-            localStorage.setItem(storageKey, biz.id);
-            setBusinessId(biz.id);
-            populateFields(biz);
-          } else {
-            localStorage.removeItem(storageKey);
-            setBusinessId("");
-          }
-        } else {
-          const [bizsRes, usersRes] = await Promise.all([
-            getBusinesses().catch(() => ({ data: [] })),
-            getUsers().catch(() => ({ data: [] })),
-          ]);
-          setBusinessesList(bizsRes.data);
-          setUsers(usersRes.data);
-
-          if (businessId) {
-            const activeBiz = bizsRes.data.find((b) => b.id === businessId);
-            if (activeBiz) {
-              populateFields(activeBiz);
-            } else {
-              localStorage.removeItem(storageKey);
-              setBusinessId("");
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching business data:", err);
-        setError("Error al cargar la información.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId]);
-
   const populateFields = (biz) => {
     setName(biz.name || "");
     setLegalName(biz.legalName || "");
@@ -175,7 +132,7 @@ const BusinessManage = () => {
     setOwnerId(biz.ownerId || "");
     setCommissionPercentage(biz.commissionPercentage !== undefined ? biz.commissionPercentage : 10);
     setIsActive(biz.isActive !== undefined ? biz.isActive : true);
-    setFreeDeliveryAbove(biz.freeDeliveryAbove !== undefined && biz.freeDeliveryAbove !== null ? biz.freeDeliveryAbove : "");
+    setFreeDeliveryAbove(biz.freeDeliveryAbove !== undefined && biz.freeDeliveryAbove !== null && biz.freeDeliveryAbove > 0 ? String(biz.freeDeliveryAbove) : "");
     setIsOfficialStore(!!biz.isOfficialStore);
     setRating(biz.rating !== undefined ? parseFloat(biz.rating) : 5);
     setReviewsCount(biz.reviewsCount !== undefined ? parseInt(biz.reviewsCount, 10) : 0);
@@ -192,6 +149,109 @@ const BusinessManage = () => {
     }
   };
 
+  const handleResetNewBusiness = (targetOwnerId = "") => {
+    localStorage.removeItem(storageKey);
+    setBusinessId("");
+    setName("");
+    setLegalName("");
+    setRif("");
+    setCategoryId(categories.length > 0 ? categories[0].id : "");
+    setLatitude(10.6596);
+    setLongitude(-71.6092);
+    setOpenTime("08:00");
+    setCloseTime("22:00");
+    setImageUrl("");
+    setOwnerId(targetOwnerId || "");
+    setCommissionPercentage(10);
+    setIsActive(true);
+    setFreeDeliveryAbove("");
+    setIsOfficialStore(false);
+    setRating(5);
+    setReviewsCount(0);
+    setPaymentBank("0102 - Banco de Venezuela");
+    setPaymentPhone("");
+    setPaymentId("");
+    setPaymentAccountName("");
+    setError("");
+    setSuccess("Formulario listo para registrar un nuevo comercio.");
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [catsRes] = await Promise.all([
+          getCategories().catch(() => ({ data: [] })),
+        ]);
+
+        const cats = catsRes.data || [];
+        setCategories(cats);
+
+        if (isBusiness) {
+          const ownerBizRes = await getBusinessByOwner(user?.id).catch(() => null);
+          if (ownerBizRes && ownerBizRes.data && ownerBizRes.data.id) {
+            const biz = ownerBizRes.data;
+            localStorage.setItem(storageKey, biz.id);
+            setBusinessId(biz.id);
+            populateFields(biz);
+          } else {
+            localStorage.removeItem(storageKey);
+            setBusinessId("");
+            if (cats.length > 0) setCategoryId(cats[0].id);
+          }
+        } else {
+          const [bizsRes, usersRes] = await Promise.all([
+            getBusinesses().catch(() => ({ data: [] })),
+            getUsers().catch(() => ({ data: [] })),
+          ]);
+          const bList = bizsRes.data || [];
+          setBusinessesList(bList);
+          setUsers(usersRes.data || []);
+
+          if (urlBusinessId) {
+            const targetBiz = bList.find((b) => b.id === urlBusinessId);
+            if (targetBiz) {
+              setBusinessId(targetBiz.id);
+              populateFields(targetBiz);
+              return;
+            }
+          }
+
+          if (urlOwnerId) {
+            setOwnerId(urlOwnerId);
+            const existingForOwner = bList.find((b) => b.ownerId === urlOwnerId);
+            if (existingForOwner) {
+              setBusinessId(existingForOwner.id);
+              populateFields(existingForOwner);
+              return;
+            } else {
+              setBusinessId("");
+              handleResetNewBusiness(urlOwnerId);
+              return;
+            }
+          }
+
+          if (businessId) {
+            const activeBiz = bList.find((b) => b.id === businessId);
+            if (activeBiz) {
+              populateFields(activeBiz);
+            } else {
+              localStorage.removeItem(storageKey);
+              setBusinessId("");
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching business data:", err);
+        setError("Error al cargar la información del comercio.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, urlBusinessId, urlOwnerId]);
+
   const handleSelectBusiness = (id) => {
     const selected = businessesList.find((b) => b.id === id);
     if (selected) {
@@ -206,30 +266,41 @@ const BusinessManage = () => {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!name.trim()) {
+      setError("El nombre comercial es obligatorio.");
+      return;
+    }
+
+    if (!categoryId) {
+      setError("Debes seleccionar una categoría principal para el comercio.");
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
-      name,
-      legalName,
-      rif,
+      name: name.trim(),
+      legalName: legalName.trim(),
+      rif: rif.trim(),
       categoryId,
-      latitude: parseFloat(latitude),
-      longitude: parseFloat(longitude),
-      openTime,
-      closeTime,
+      latitude: parseFloat(latitude) || 10.6596,
+      longitude: parseFloat(longitude) || -71.6092,
+      openTime: openTime || "08:00",
+      closeTime: closeTime || "22:00",
       images: imageUrl ? [imageUrl] : [],
       ownerId: ownerId || null,
-      commissionPercentage: parseFloat(commissionPercentage),
-      isActive,
-      freeDeliveryAbove: freeDeliveryAbove !== "" ? parseFloat(freeDeliveryAbove) : null,
-      isOfficialStore,
-      paymentBank,
-      paymentPhone,
-      paymentId,
-      paymentAccountName,
+      commissionPercentage: parseFloat(commissionPercentage) || 10,
+      isActive: isActive !== false,
+      freeDeliveryAbove: freeDeliveryAbove !== "" && !isNaN(parseFloat(freeDeliveryAbove)) ? parseFloat(freeDeliveryAbove) : 0,
+      isOfficialStore: !!isOfficialStore,
+      paymentBank: paymentBank || "0102 - Banco de Venezuela",
+      paymentPhone: paymentPhone.trim(),
+      paymentId: paymentId.trim(),
+      paymentAccountName: paymentAccountName.trim(),
     };
 
-    if (isBusiness) {
+    if (isBusiness && user?.id) {
       payload.ownerId = user.id;
     }
 
@@ -246,9 +317,12 @@ const BusinessManage = () => {
         populateFields(res.data);
         setSuccess("Comercio registrado y configurado con éxito.");
       }
+      const bizsRes = await getBusinesses().catch(() => ({ data: [] }));
+      setBusinessesList(bizsRes.data || []);
     } catch (err) {
       console.error("Error saving business:", err);
-      setError(err.response?.data?.message || "Error al guardar el comercio.");
+      const errMsg = err.response?.data?.message || err.message || "Error al guardar el comercio.";
+      setError(Array.isArray(errMsg) ? errMsg.join(". ") : errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -360,26 +434,57 @@ const BusinessManage = () => {
               </Typography>
             </Box>
 
-            {businessId && isAdmin && (
-              <Box display="flex" gap="10px">
+            <Box display="flex" gap="10px" flexWrap="wrap" alignItems="center">
+              {businessId && (
                 <Button
-                  variant="outlined"
-                  color="error"
-                  onClick={handleDeleteBusiness}
-                  sx={{ border: `1px solid ${colors.redAccent[500]}`, color: colors.redAccent[400] }}
+                  variant="contained"
+                  startIcon={<ShoppingBagOutlinedIcon />}
+                  onClick={() => navigate(`/my-products?businessId=${businessId}`)}
+                  sx={{
+                    bgcolor: colors.blueAccent[600],
+                    color: "#fff",
+                    fontWeight: "bold",
+                    "&:hover": { bgcolor: colors.blueAccent[700] }
+                  }}
                 >
-                  Eliminar Comercio
+                  Ver / Agregar Productos
                 </Button>
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  onClick={handleDisconnect}
-                  sx={{ border: `1px solid ${colors.grey[500]}`, color: colors.grey[300] }}
-                >
-                  Desvincular
-                </Button>
-              </Box>
-            )}
+              )}
+
+              {businessId && isAdmin && (
+                <>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => handleResetNewBusiness()}
+                    sx={{
+                      bgcolor: colors.greenAccent[500],
+                      color: "#000",
+                      fontWeight: "bold",
+                      "&:hover": { bgcolor: colors.greenAccent[600] }
+                    }}
+                  >
+                    Crear Nuevo Comercio
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={handleDeleteBusiness}
+                    sx={{ border: `1px solid ${colors.redAccent[500]}`, color: colors.redAccent[400] }}
+                  >
+                    Eliminar Comercio
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    onClick={handleDisconnect}
+                    sx={{ border: `1px solid ${colors.grey[500]}`, color: colors.grey[300] }}
+                  >
+                    Desvincular
+                  </Button>
+                </>
+              )}
+            </Box>
           </Box>
 
           <form onSubmit={handleSave}>

@@ -111,9 +111,9 @@ const Contacts = () => {
     {
       field: "actions",
       headerName: "Acciones",
-      flex: 1.8,
+      flex: 2.4,
       renderCell: (params) => (
-        <Box display="flex" gap="10px">
+        <Box display="flex" gap="8px">
           <Button
             variant="contained"
             size="small"
@@ -125,7 +125,20 @@ const Contacts = () => {
               "&:hover": { backgroundColor: colors.greenAccent[600] }
             }}
           >
-            Ver Productos
+            Productos
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => navigate(`/my-business?businessId=${params.row.id}`)}
+            sx={{
+              borderColor: colors.blueAccent[400],
+              color: colors.blueAccent[300],
+              fontWeight: "bold",
+              "&:hover": { borderColor: colors.blueAccent[500] }
+            }}
+          >
+            Editar
           </Button>
           <Button
             variant="contained"
@@ -219,7 +232,7 @@ const Contacts = () => {
         <>
           <Header title="COMERCIOS" subtitle="Administración de establecimientos afiliados" />
           
-          <Box display="flex" gap="15px" alignItems="center" mt="20px" mb="10px">
+          <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="15px" mt="20px" mb="10px">
             <TextField
               label="Buscar Comercio por Nombre o Categoría..."
               variant="outlined"
@@ -234,6 +247,21 @@ const Contacts = () => {
                 }
               }}
             />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate("/my-business")}
+              sx={{
+                backgroundColor: colors.greenAccent[500],
+                color: "#000",
+                fontWeight: "bold",
+                px: "20px",
+                py: "9px",
+                "&:hover": { backgroundColor: colors.greenAccent[600] }
+              }}
+            >
+              Registrar Nuevo Comercio
+            </Button>
           </Box>
 
           <Box
@@ -275,25 +303,41 @@ const Contacts = () => {
               </Box>
             </Box>
 
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => {
-                const user = JSON.parse(localStorage.getItem("user")) || {};
-                localStorage.setItem(`myBusinessId_${user.id || "default"}`, selectedBusiness.id);
-                navigate("/my-products");
-              }}
-              sx={{
-                backgroundColor: colors.greenAccent[500],
-                color: "#000",
-                fontWeight: "bold",
-                px: "20px",
-                py: "10px",
-                "&:hover": { backgroundColor: colors.greenAccent[600] }
-              }}
-            >
-              + Gestionar / Subir Productos
-            </Button>
+            <Box display="flex" gap="10px">
+              <Button
+                variant="outlined"
+                onClick={() => navigate(`/my-business?businessId=${selectedBusiness.id}`)}
+                sx={{
+                  borderColor: colors.blueAccent[400],
+                  color: colors.blueAccent[300],
+                  fontWeight: "bold",
+                  px: "15px",
+                  py: "10px",
+                  "&:hover": { borderColor: colors.blueAccent[500] }
+                }}
+              >
+                Editar Comercio
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  const user = JSON.parse(localStorage.getItem("user")) || {};
+                  localStorage.setItem(`myBusinessId_${user.id || "default"}`, selectedBusiness.id);
+                  navigate(`/my-products?businessId=${selectedBusiness.id}`);
+                }}
+                sx={{
+                  backgroundColor: colors.greenAccent[500],
+                  color: "#000",
+                  fontWeight: "bold",
+                  px: "20px",
+                  py: "10px",
+                  "&:hover": { backgroundColor: colors.greenAccent[600] }
+                }}
+              >
+                + Gestionar / Subir Productos
+              </Button>
+            </Box>
           </Box>
 
           <Paper elevation={3} sx={{ p: "25px", bgcolor: colors.primary[400], mb: "25px", border: `1px solid ${colors.grey[700]}` }}>

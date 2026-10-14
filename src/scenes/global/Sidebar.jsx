@@ -184,6 +184,13 @@ const Sidebar = ({ user }) => {
                   setSelected={setSelected}
                 />
                 <Item
+                  title="Registrar / Editar Comercio"
+                  to="/my-business"
+                  icon={<StorefrontOutlinedIcon />}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
                   title="Catálogo y Productos"
                   to="/my-products"
                   icon={<ShoppingBagOutlinedIcon />}

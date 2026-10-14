@@ -6,15 +6,18 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Header from "../../components/Header";
 import { tokens } from "../../theme";
 import { useTheme } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { createUser, uploadUserImage } from "../../services/api";
 
 const Form = () => {
   const isNonMobile = useMediaQuery("(min-width:600px)");
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const navigate = useNavigate();
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [createdBusinessUser, setCreatedBusinessUser] = useState(null);
 
   const [uploadingImage, setUploadingImage] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -44,7 +47,7 @@ const Form = () => {
     setError("");
     setSuccess("");
     try {
-      await createUser({
+      const res = await createUser({
         fullName: values.fullName,
         email: values.email,
         password: values.password,
@@ -52,6 +55,11 @@ const Form = () => {
         avatarUrl: avatarUrl || undefined
       });
       setSuccess("¡Usuario creado y registrado correctamente en Igo!");
+      if (values.role === "bussiness" || values.role === "business") {
+        setCreatedBusinessUser(res.data);
+      } else {
+        setCreatedBusinessUser(null);
+      }
       setAvatarUrl("");
       resetForm();
     } catch (err) {
@@ -68,6 +76,31 @@ const Form = () => {
       <Box display="flex" flexDirection="column" gap="20px" maxWidth="700px" mt="20px">
         {success && <Alert severity="success" sx={{ bgcolor: "#1b2c1b", color: "#88ff88" }}>{success}</Alert>}
         {error && <Alert severity="error" sx={{ bgcolor: "#2a1515", color: "#ff8888" }}>{error}</Alert>}
+
+        {createdBusinessUser && (
+          <Paper elevation={4} sx={{ p: "20px", bgcolor: colors.primary[400], border: `1px solid ${colors.greenAccent[500]}`, borderRadius: "8px" }}>
+            <Typography variant="h5" color={colors.greenAccent[400]} fontWeight="bold" gutterBottom>
+              🏢 ¿Deseas registrar el comercio para {createdBusinessUser.fullName}?
+            </Typography>
+            <Typography variant="body2" color={colors.grey[300]} sx={{ mb: "15px" }}>
+              Has creado la cuenta con rol de Comercio ({createdBusinessUser.email}). Ahora puedes registrar su establecimiento comercial y asignárselo directamente.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => navigate(`/my-business?ownerId=${createdBusinessUser.id}`)}
+              sx={{
+                bgcolor: colors.greenAccent[500],
+                color: "#000",
+                fontWeight: "bold",
+                px: "25px",
+                py: "10px",
+                "&:hover": { bgcolor: colors.greenAccent[600] }
+              }}
+            >
+              Registrar Comercio para este Usuario Ahora
+            </Button>
+          </Paper>
+        )}
 
         <Paper elevation={3} sx={{ p: "30px", bgcolor: colors.primary[400], border: `1px solid ${colors.greenAccent[600]}` }}>
           <Formik

@@ -12,6 +12,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CategoryIcon from "@mui/icons-material/Category";
 import Header from "../../components/Header";
+import { useSearchParams } from "react-router-dom";
 import { 
   getBusinessProducts, 
   createBusinessProduct, 
@@ -32,7 +33,10 @@ const BusinessProducts = () => {
   const user = JSON.parse(localStorage.getItem("user")) || {};
   const userId = user?.id || "default";
 
-  const [myBusinessId, setMyBusinessId] = useState("");
+  const [searchParams] = useSearchParams();
+  const paramBusinessId = searchParams.get("businessId");
+
+  const [myBusinessId, setMyBusinessId] = useState(paramBusinessId || "");
   const [businessesList, setBusinessesList] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,12 @@ const BusinessProducts = () => {
           const res = await getBusinesses();
           const list = res.data || [];
           setBusinessesList(list);
+
+          if (paramBusinessId && list.some(b => b.id === paramBusinessId)) {
+            setMyBusinessId(paramBusinessId);
+            localStorage.setItem(`myBusinessId_${userId}`, paramBusinessId);
+            return;
+          }
 
           const savedId = localStorage.getItem(`myBusinessId_${userId}`);
           const exists = list.find(b => b.id === savedId);
@@ -69,8 +79,8 @@ const BusinessProducts = () => {
           console.error("Error cargando comercios para admin:", err);
         }
       } else if (isBusiness) {
-        const ownerBizRes = await getBusinessByOwner(user.id).catch(() => null);
-        if (ownerBizRes && ownerBizRes.data) {
+        const ownerBizRes = await getBusinessByOwner(user?.id).catch(() => null);
+        if (ownerBizRes && ownerBizRes.data && ownerBizRes.data.id) {
           setMyBusinessId(ownerBizRes.data.id);
         } else {
           setMyBusinessId("");
