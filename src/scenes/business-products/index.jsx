@@ -18,6 +18,7 @@ import {
   updateBusinessProduct, 
   deleteBusinessProduct, 
   getBusinessByOwner, 
+  getBusinesses,
   uploadProductImage,
   getMenuCategoriesByBusiness,
   createMenuCategory,
@@ -32,6 +33,7 @@ const BusinessProducts = () => {
   const userId = user?.id || "default";
 
   const [myBusinessId, setMyBusinessId] = useState("");
+  const [businessesList, setBusinessesList] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -39,10 +41,34 @@ const BusinessProducts = () => {
   const [success, setSuccess] = useState("");
 
   const isBusiness = user?.roles?.includes("bussiness") || user?.roles?.includes("business");
+  const isAdmin = user?.roles?.includes("admin");
 
   useEffect(() => {
     const resolveBusiness = async () => {
-      if (isBusiness) {
+      if (isAdmin) {
+        try {
+          const res = await getBusinesses();
+          const list = res.data || [];
+          setBusinessesList(list);
+
+          const savedId = localStorage.getItem(`myBusinessId_${userId}`);
+          const exists = list.find(b => b.id === savedId);
+
+          if (exists) {
+            setMyBusinessId(savedId);
+          } else {
+            // Dar prioridad a la Tienda Oficial IGO
+            const official = list.find(b => b.isOfficialStore || b.name?.toLowerCase().includes("oficial") || b.name?.toLowerCase().includes("igo"));
+            if (official) {
+              setMyBusinessId(official.id);
+            } else if (list.length > 0) {
+              setMyBusinessId(list[0].id);
+            }
+          }
+        } catch (err) {
+          console.error("Error cargando comercios para admin:", err);
+        }
+      } else if (isBusiness) {
         const ownerBizRes = await getBusinessByOwner(user.id).catch(() => null);
         if (ownerBizRes && ownerBizRes.data) {
           setMyBusinessId(ownerBizRes.data.id);
@@ -55,7 +81,7 @@ const BusinessProducts = () => {
       }
     };
     resolveBusiness();
-  }, [userId, isBusiness]);
+  }, [userId, isBusiness, isAdmin]);
   
   // Modal state
   const [openModal, setOpenModal] = useState(false);
@@ -337,8 +363,42 @@ const BusinessProducts = () => {
 
   return (
     <Box m="20px">
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Header title="PRODUCTOS" subtitle="Administra el inventario de productos de tu comercio" />
+      <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="15px">
+        <Header 
+          title="CATÁLOGO Y PRODUCTOS" 
+          subtitle={isAdmin ? "Administra los productos de la Tienda Oficial IGO o cualquier comercio afiliado" : "Administra el inventario de productos de tu comercio"} 
+        />
+
+        {isAdmin && businessesList.length > 0 && (
+          <FormControl size="small" sx={{ minWidth: 280 }}>
+            <InputLabel id="select-biz-label" sx={{ color: colors.greenAccent[500], fontWeight: "bold" }}>
+              Comercio Seleccionado
+            </InputLabel>
+            <Select
+              labelId="select-biz-label"
+              value={myBusinessId}
+              label="Comercio Seleccionado"
+              onChange={(e) => {
+                const val = e.target.value;
+                setMyBusinessId(val);
+                localStorage.setItem(`myBusinessId_${userId}`, val);
+              }}
+              sx={{
+                color: colors.grey[100],
+                fontWeight: "bold",
+                backgroundColor: colors.primary[400],
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.greenAccent[500], borderWidth: "1.5px" },
+              }}
+            >
+              {businessesList.map((b) => (
+                <MenuItem key={b.id} value={b.id}>
+                  {b.isOfficialStore ? `👑 ${b.name} (Oficial IGO)` : b.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+
         {myBusinessId && (
           <Box display="flex" gap="10px">
             <Button

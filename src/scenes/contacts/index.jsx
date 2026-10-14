@@ -3,6 +3,8 @@ import { Box, Typography, Button, useTheme, CircularProgress, Paper, IconButton,
 import { DataGrid } from "@mui/x-data-grid";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import StorefrontIcon from "@mui/icons-material/Storefront";
+import AddIcon from "@mui/icons-material/Add";
+import { useNavigate } from "react-router-dom";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import { getBusinesses, getBusinessProducts, updateBusinessProduct, updateBusiness, deleteBusiness } from "../../services/api";
@@ -10,6 +12,7 @@ import { getBusinesses, getBusinessProducts, updateBusinessProduct, updateBusine
 const Contacts = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const navigate = useNavigate();
 
   const [businesses, setBusinesses] = useState([]);
   const [products, setProducts] = useState([]);
@@ -256,19 +259,41 @@ const Contacts = () => {
         </>
       ) : (
         <Box>
-          <Box display="flex" alignItems="center" gap="15px" mb="20px">
-            <IconButton onClick={() => setSelectedBusiness(null)} sx={{ color: colors.grey[100] }}>
-              <ArrowBackIcon />
-            </IconButton>
-            <Box>
-              <Typography variant="h2" color={colors.grey[100]} fontWeight="bold" display="flex" alignItems="center" gap="10px">
-                <StorefrontIcon sx={{ color: colors.greenAccent[500], fontSize: "32px" }} />
-                {selectedBusiness.name}
-              </Typography>
-              <Typography variant="h5" color={colors.greenAccent[500]}>
-                Detalles del Catálogo de Productos
-              </Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb="20px" flexWrap="wrap" gap="15px">
+            <Box display="flex" alignItems="center" gap="15px">
+              <IconButton onClick={() => setSelectedBusiness(null)} sx={{ color: colors.grey[100] }}>
+                <ArrowBackIcon />
+              </IconButton>
+              <Box>
+                <Typography variant="h2" color={colors.grey[100]} fontWeight="bold" display="flex" alignItems="center" gap="10px">
+                  <StorefrontIcon sx={{ color: colors.greenAccent[500], fontSize: "32px" }} />
+                  {selectedBusiness.name}
+                </Typography>
+                <Typography variant="h5" color={colors.greenAccent[500]}>
+                  Detalles del Catálogo de Productos
+                </Typography>
+              </Box>
             </Box>
+
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                const user = JSON.parse(localStorage.getItem("user")) || {};
+                localStorage.setItem(`myBusinessId_${user.id || "default"}`, selectedBusiness.id);
+                navigate("/my-products");
+              }}
+              sx={{
+                backgroundColor: colors.greenAccent[500],
+                color: "#000",
+                fontWeight: "bold",
+                px: "20px",
+                py: "10px",
+                "&:hover": { backgroundColor: colors.greenAccent[600] }
+              }}
+            >
+              + Gestionar / Subir Productos
+            </Button>
           </Box>
 
           <Paper elevation={3} sx={{ p: "25px", bgcolor: colors.primary[400], mb: "25px", border: `1px solid ${colors.grey[700]}` }}>

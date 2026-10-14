@@ -92,7 +92,7 @@ const Sidebar = ({ user }) => {
                 ml="15px"
               >
                 <Typography variant="h3" color={colors.grey[100]}>
-                  INGÖ STORE
+                  IGO STORE
                 </Typography>
                 <IconButton onClick={() => setIsCollapsed(!isCollapsed)}>
                   <MenuOutlinedIcon />
@@ -180,6 +180,13 @@ const Sidebar = ({ user }) => {
                   title="Comercios"
                   to="/contacts"
                   icon={<ContactsOutlinedIcon />}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
+                  title="Catálogo y Productos"
+                  to="/my-products"
+                  icon={<ShoppingBagOutlinedIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />
