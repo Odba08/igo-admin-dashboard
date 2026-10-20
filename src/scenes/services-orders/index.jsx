@@ -115,11 +115,12 @@ export default function ServicesOrders() {
     try {
       const res = await getOrders();
       const allOrders = res.data || [];
-      // Filter only IGO Favor and IGO Taxi
+      // Filter only IGO Favor, IGO Taxi, IGO Moto
       const serviceOnly = allOrders.filter(
         (o) =>
           o.category === "IgoFavor" ||
           o.category === "IgoTaxi" ||
+          o.category === "IgoMoto" ||
           o.category === "Envíos" ||
           !o.business ||
           o.business?.id === "00000000-0000-0000-0000-000000000000"
@@ -236,11 +237,13 @@ export default function ServicesOrders() {
   };
 
   // Metrics
-  const favorsList = orders.filter((o) => o.category === "IgoFavor" || o.category === "Envíos" || o.shippingType === "Moto");
-  const taxilist = orders.filter((o) => o.category === "IgoTaxi" || o.shippingType === "Carro");
+  const favorsList = orders.filter((o) => o.category === "IgoFavor" || o.category === "Envíos");
+  const taxilist = orders.filter((o) => (o.category === "IgoTaxi" && o.shippingType !== "Moto") || (o.shippingType === "Carro" && o.category !== "IgoFavor"));
+  const motoTaxiList = orders.filter((o) => o.category === "IgoMoto" || (o.category === "IgoTaxi" && o.shippingType === "Moto"));
 
   const activeFavors = favorsList.filter((o) => o.status !== "DELIVERED" && o.status !== "CANCELLED").length;
   const activeTaxis = taxilist.filter((o) => o.status !== "DELIVERED" && o.status !== "CANCELLED").length;
+  const activeMotos = motoTaxiList.filter((o) => o.status !== "DELIVERED" && o.status !== "CANCELLED").length;
   const pendingAssignment = orders.filter((o) => !o.deliveryUser && o.status !== "DELIVERED" && o.status !== "CANCELLED").length;
   const totalServicesRevenue = orders.filter((o) => o.isPaid).reduce((acc, o) => acc + (o.totalAmount || 0), 0);
 
@@ -248,10 +251,14 @@ export default function ServicesOrders() {
   const displayedOrders = orders.filter((o) => {
     if (activeTab === 1) {
       // Solo IGO Favor
-      if (o.category === "IgoTaxi") return false;
+      if (o.category !== "IgoFavor" && o.category !== "Envíos") return false;
     } else if (activeTab === 2) {
-      // Solo IGO Taxi
+      // Solo IGO Taxi (Carro)
       if (o.category !== "IgoTaxi" && o.shippingType !== "Carro") return false;
+      if (o.category === "IgoMoto" || (o.category === "IgoTaxi" && o.shippingType === "Moto")) return false;
+    } else if (activeTab === 3) {
+      // Solo IGO Moto Taxi
+      if (o.category !== "IgoMoto" && !(o.category === "IgoTaxi" && o.shippingType === "Moto")) return false;
     }
 
     if (filterStatus !== "ALL" && o.status !== filterStatus) return false;
@@ -280,17 +287,32 @@ export default function ServicesOrders() {
       headerName: "Tipo de Servicio",
       width: 140,
       renderCell: (params) => {
-        const isTaxi = params.row.category === "IgoTaxi" || params.row.shippingType === "Carro";
+        const isCarTaxi = (params.row.category === "IgoTaxi" && params.row.shippingType !== "Moto") || params.row.shippingType === "Carro";
+        const isMotoTaxi = params.row.category === "IgoMoto" || (params.row.category === "IgoTaxi" && params.row.shippingType === "Moto");
+
+        let label = "IGO Favor";
+        let icon = <TwoWheelerIcon style={{ fontSize: "16px", color: "#fff" }} />;
+        let bgcolor = "#6200EE";
+        let color = "#fff";
+
+        if (isCarTaxi) {
+          label = "IGO Taxi (Carro)";
+          icon = <LocalTaxiIcon style={{ fontSize: "16px", color: "#000" }} />;
+          bgcolor = colors.greenAccent[400];
+          color = "#000";
+        } else if (isMotoTaxi) {
+          label = "IGO Moto Taxi";
+          icon = <TwoWheelerIcon style={{ fontSize: "16px", color: "#000" }} />;
+          bgcolor = "#FFDB58";
+          color = "#000";
+        }
+
         return (
           <Chip
-            icon={isTaxi ? <LocalTaxiIcon style={{ fontSize: "16px", color: "#000" }} /> : <TwoWheelerIcon style={{ fontSize: "16px", color: "#fff" }} />}
-            label={isTaxi ? "IGO Taxi" : "IGO Favor"}
+            icon={icon}
+            label={label}
             size="small"
-            sx={{
-              fontWeight: "bold",
-              bgcolor: isTaxi ? colors.greenAccent[400] : "#6200EE",
-              color: isTaxi ? "#000" : "#fff",
-            }}
+            sx={{ fontWeight: "bold", bgcolor, color }}
           />
         );
       },
@@ -402,15 +424,15 @@ export default function ServicesOrders() {
     {
       field: "isPaid",
       headerName: "Pago",
-      width: 130,
+      width: 140,
       renderCell: (params) => {
         const isPaid = params.row.isPaid === true;
-        const isTaxi = params.row.category === "IgoTaxi";
+        const isDirectDriver = params.row.category === "IgoTaxi" || params.row.category === "IgoMoto" || params.row.category === "IgoFavor" || params.row.paymentRecipient === "Pago Conductor";
         return (
           <Box display="flex" alignItems="center" gap="4px">
             <Chip
-              label={isPaid ? "Pagado" : (isTaxi ? "Al Conductor" : "En revisión")}
-              color={isPaid ? "success" : "warning"}
+              label={isPaid ? "Pagado" : (isDirectDriver ? "Al Conductor" : "En revisión")}
+              color={isPaid ? "success" : (isDirectDriver ? "info" : "warning")}
               size="small"
               onClick={() => handlePaymentToggle(params.row.id, isPaid)}
               sx={{ fontWeight: "bold", fontSize: "10px", cursor: "pointer" }}
@@ -646,7 +668,7 @@ export default function ServicesOrders() {
         </Card>
       </Box>
 
-      {/* Tabs para bifurcar Favor y Taxi */}
+      {/* Tabs para bifurcar Favor, Taxi Carro y Moto Taxi */}
       <Box sx={{ borderBottom: 1, borderColor: colors.grey[700], mb: 2 }}>
         <Tabs
           value={activeTab}
@@ -654,9 +676,10 @@ export default function ServicesOrders() {
           textColor="secondary"
           indicatorColor="secondary"
         >
-          <Tab label={`⚡ Todos los Servicios (${orders.length})`} sx={{ fontWeight: "bold" }} />
+          <Tab label={`⚡ Todos (${orders.length})`} sx={{ fontWeight: "bold" }} />
           <Tab label={`📦 IGO Favor (${favorsList.length})`} sx={{ fontWeight: "bold" }} />
-          <Tab label={`🚕 IGO Taxi (${taxilist.length})`} sx={{ fontWeight: "bold" }} />
+          <Tab label={`🚕 IGO Taxi Carro (${taxilist.length})`} sx={{ fontWeight: "bold" }} />
+          <Tab label={`🛵 IGO Moto Taxi (${motoTaxiList.length})`} sx={{ fontWeight: "bold" }} />
         </Tabs>
       </Box>
 
