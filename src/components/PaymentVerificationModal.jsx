@@ -59,6 +59,18 @@ export default function PaymentVerificationModal({
             <Typography variant="h4" fontWeight="bold">
               Verificar Pago Móvil - Pedido #{String(order.orderNumber).padStart(4, "0")}
             </Typography>
+            {order.pickupCode && (
+              <Chip
+                label={`PIN: ${order.pickupCode}`}
+                size="small"
+                sx={{
+                  fontWeight: "bold",
+                  backgroundColor: "rgba(255, 215, 0, 0.2)",
+                  color: "#FFD700",
+                  border: "1px solid rgba(255, 215, 0, 0.6)",
+                }}
+              />
+            )}
           </Box>
           <Chip
             label={order.isPaid ? "Ya Verificado (Pagado)" : "Pendiente de Verificación"}

@@ -52,6 +52,12 @@ export const updateOrder = (id, data) => api.patch(`/orders/${id}`, data);
 export const assignOrderDriver = (id, deliveryUserId) => api.patch(`/orders/${id}/assign-driver`, { deliveryUserId });
 export const verifyOrderPayment = (id, isPaid = true) => api.patch(`/orders/${id}/verify-payment`, { isPaid });
 export const getBusinessDebtsReport = () => api.get('/orders/reports/business-debts');
+export const getBusinessSettlement = (businessId, startDate, endDate) => {
+  const params = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  return api.get(`/orders/business/${businessId}/settlement`, { params });
+};
 export const sendOrderChatMessage = (orderId, messageData) => api.post(`/orders/${orderId}/chat`, messageData);
 
 // Menu Categories (Categorías internas de tienda)
@@ -60,10 +66,10 @@ export const createMenuCategory = (data) => api.post('/menu-category', data);
 export const updateMenuCategory = (id, data) => api.patch(`/menu-category/${id}`, data);
 export const deleteMenuCategory = (id) => api.delete(`/menu-category/${id}`);
 
-// Businesses & Products Services
-export const getBusinesses = () => api.get('/business');
-export const getProducts = () => api.get('/products');
-export const getBusinessProducts = (businessId) => api.get(`/business/${businessId}/products`);
+// Businesses & Products Services (Sin limitaciones forzadas)
+export const getBusinesses = (params) => api.get('/business', { params });
+export const getProducts = (params) => api.get('/products', { params });
+export const getBusinessProducts = (businessId, params) => api.get(`/business/${businessId}/products`, { params });
 export const createBusinessProduct = (businessId, productData) => api.post(`/business/${businessId}/products`, productData);
 export const updateBusinessProduct = (businessId, productId, productData) => api.patch(`/business/${businessId}/products/${productId}`, productData);
 export const deleteBusinessProduct = (businessId, productId) => api.delete(`/business/${businessId}/products/${productId}`);

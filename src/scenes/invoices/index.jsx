@@ -729,12 +729,28 @@ const Invoices = () => {
   const columns = [
     { 
       field: "orderNumber", 
-      headerName: "Nº Orden", 
-      width: 100,
+      headerName: "Nº Orden / PIN", 
+      width: 125,
       renderCell: (params) => (
-        <Typography fontWeight="bold" color={colors.greenAccent[300]}>
-          #{String(params.row.orderNumber).padStart(4, "0")}
-        </Typography>
+        <Box display="flex" flexDirection="column" gap="2px">
+          <Typography fontWeight="bold" color={colors.greenAccent[300]}>
+            #{String(params.row.orderNumber).padStart(4, "0")}
+          </Typography>
+          {params.row.pickupCode && (
+            <Chip
+              label={`PIN: ${params.row.pickupCode}`}
+              size="small"
+              sx={{
+                height: "18px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                backgroundColor: "rgba(255, 215, 0, 0.15)",
+                color: "#FFD700",
+                border: "1px solid rgba(255, 215, 0, 0.4)",
+              }}
+            />
+          )}
+        </Box>
       )
     },
     {
@@ -875,23 +891,40 @@ const Invoices = () => {
     },
     {
       field: "status",
-      headerName: "Estado",
-      width: 150,
-      renderCell: (params) => (
-        <Select
-          value={params.row.status}
-          onChange={(e) => handleStatusChange(params.row.id, e.target.value)}
-          size="small"
-          sx={{ fontSize: "12px", height: "30px" }}
-        >
-          <MenuItem value="PENDING">PENDING</MenuItem>
-          <MenuItem value="PAID">PAID</MenuItem>
-          <MenuItem value="PREPARING">PREPARING</MenuItem>
-          <MenuItem value="ON_WAY">ON_WAY</MenuItem>
-          <MenuItem value="DELIVERED">DELIVERED</MenuItem>
-          <MenuItem value="CANCELLED">CANCELLED</MenuItem>
-        </Select>
-      )
+      headerName: "Estado / Fase Repartidor",
+      width: 175,
+      renderCell: (params) => {
+        const stageLabels = {
+          TO_PICKUP: "En camino a tienda",
+          ARRIVED_PICKUP: "En la tienda",
+          ON_THE_WAY: "En camino a cliente",
+          ARRIVED_DESTINATION: "Llegó al cliente",
+        };
+        const stageLabel = params.row.driverStage ? stageLabels[params.row.driverStage] || params.row.driverStage : null;
+
+        return (
+          <Box display="flex" flexDirection="column" gap="4px">
+            <Select
+              value={params.row.status}
+              onChange={(e) => handleStatusChange(params.row.id, e.target.value)}
+              size="small"
+              sx={{ fontSize: "12px", height: "28px" }}
+            >
+              <MenuItem value="PENDING">PENDING</MenuItem>
+              <MenuItem value="PAID">PAID</MenuItem>
+              <MenuItem value="PREPARING">PREPARING</MenuItem>
+              <MenuItem value="ON_WAY">ON_WAY</MenuItem>
+              <MenuItem value="DELIVERED">DELIVERED</MenuItem>
+              <MenuItem value="CANCELLED">CANCELLED</MenuItem>
+            </Select>
+            {stageLabel && (
+              <Typography variant="caption" sx={{ fontSize: "10px", color: colors.blueAccent[300], fontWeight: "bold" }}>
+                🛵 {stageLabel}
+              </Typography>
+            )}
+          </Box>
+        );
+      }
     },
     {
       field: "supportTicket",
@@ -1238,7 +1271,14 @@ const Invoices = () => {
               "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
             }}
           >
-            <DataGrid loading={loading} rows={filteredOrders} columns={columns} getRowId={(row) => row.id} />
+            <DataGrid 
+              loading={loading} 
+              rows={filteredOrders} 
+              columns={columns} 
+              getRowId={(row) => row.id} 
+              pageSize={100}
+              rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
+            />
           </Box>
         </Box>
       ) : (
@@ -1719,6 +1759,8 @@ const Invoices = () => {
                   <Typography variant="body1"><strong>Despacho en:</strong> {infoOrder.shippingType || "Moto"}</Typography>
                   <Typography variant="body1"><strong>Estado Logístico:</strong> {infoOrder.status}</Typography>
                   <Typography variant="body1"><strong>Estado Pago:</strong> {infoOrder.isPaid ? "PAGADO" : "EN REVISIÓN"}</Typography>
+                  <Typography variant="body1"><strong>PIN de Despacho:</strong> <span style={{ color: "#FFD700", fontWeight: "bold" }}>{infoOrder.pickupCode || "N/A"}</span></Typography>
+                  <Typography variant="body1"><strong>Fase Conductor:</strong> {infoOrder.driverStage ? ({ TO_PICKUP: "En camino a tienda", ARRIVED_PICKUP: "En la tienda", ON_THE_WAY: "En camino a cliente", ARRIVED_DESTINATION: "Llegó al cliente" }[infoOrder.driverStage] || infoOrder.driverStage) : "Pendiente"}</Typography>
                   <Typography variant="body1"><strong>Distancia Ruta:</strong> {infoOrder.distance || "N/A"}</Typography>
                   <Typography variant="body1"><strong>Coordenadas GPS:</strong> Lat: {infoOrder.deliveryLat}, Lng: {infoOrder.deliveryLong}</Typography>
                   <Typography variant="body1"><strong>Motorizado:</strong> {infoOrder.deliveryUser?.fullName || "No asignado / Disponible"}</Typography>

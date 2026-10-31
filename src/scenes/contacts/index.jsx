@@ -281,7 +281,13 @@ const Contacts = () => {
                 <CircularProgress sx={{ color: colors.greenAccent[500] }} />
               </Box>
             ) : (
-              <DataGrid rows={filteredBusinesses} columns={businessColumns} getRowId={(row) => row.id} />
+              <DataGrid 
+                rows={filteredBusinesses} 
+                columns={businessColumns} 
+                getRowId={(row) => row.id} 
+                pageSize={100}
+                rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
+              />
             )}
           </Box>
         </>
@@ -428,7 +434,13 @@ const Contacts = () => {
                 <CircularProgress sx={{ color: colors.greenAccent[500] }} />
               </Box>
             ) : (
-              <DataGrid rows={products} columns={productColumns} getRowId={(row) => row.id} />
+              <DataGrid 
+                rows={products} 
+                columns={productColumns} 
+                getRowId={(row) => row.id} 
+                pageSize={100}
+                rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
+              />
             )}
           </Box>
         </Box>

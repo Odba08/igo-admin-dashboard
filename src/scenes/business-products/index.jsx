@@ -40,6 +40,7 @@ const BusinessProducts = () => {
   const [businessesList, setBusinessesList] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -251,8 +252,10 @@ const BusinessProducts = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setError("");
     setSuccess("");
+    setSubmitting(true);
 
     const tagsArray = tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : [];
     const imagesArray = imageUrl ? [imageUrl] : [];
@@ -267,6 +270,7 @@ const BusinessProducts = () => {
       weight: parseFloat(weight),
       tags: tagsArray,
       images: imagesArray,
+      isApproved: editingProduct ? editingProduct.isApproved : true,
       menuCategoryId: menuCategoryId || undefined,
       options: options.map(opt => ({
         title: opt.title,
@@ -292,6 +296,21 @@ const BusinessProducts = () => {
       fetchProducts(myBusinessId);
     } catch (err) {
       setError(err.response?.data?.message || "Error al guardar el producto.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleProductApproval = async (product) => {
+    try {
+      const nextApproved = !product.isApproved;
+      await updateBusinessProduct(myBusinessId, product.id, { isApproved: nextApproved });
+      setProducts(prevProducts => 
+        prevProducts.map(p => p.id === product.id ? { ...p, isApproved: nextApproved } : p)
+      );
+    } catch (err) {
+      console.error("Error toggling product approval:", err);
+      alert("No se pudo cambiar el estado de aprobación.");
     }
   };
 
@@ -353,6 +372,30 @@ const BusinessProducts = () => {
       flex: 1.5,
       renderCell: (params) => (
         <Typography>{params.row.tags?.join(", ") || ""}</Typography>
+      )
+    },
+    { 
+      field: "isApproved", 
+      headerName: "Aprobado / Activo", 
+      flex: 1.2,
+      renderCell: (params) => (
+        <FormControlLabel
+          control={
+            <Switch
+              checked={Boolean(params.row.isApproved)}
+              onChange={() => toggleProductApproval(params.row)}
+              color="success"
+              size="small"
+            />
+          }
+          label={
+            <Chip 
+              label={params.row.isApproved ? "Activo" : "Pausado"} 
+              color={params.row.isApproved ? "success" : "default"} 
+              size="small" 
+            />
+          }
+        />
       )
     },
     {
@@ -457,7 +500,14 @@ const BusinessProducts = () => {
             "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
           }}
         >
-          <DataGrid loading={loading} rows={products} columns={columns} getRowId={(row) => row.id} />
+          <DataGrid 
+            loading={loading} 
+            rows={products} 
+            columns={columns} 
+            getRowId={(row) => row.id} 
+            pageSize={100}
+            rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
+          />
         </Box>
       )}
 
@@ -799,6 +849,7 @@ const BusinessProducts = () => {
             <Button
               type="submit"
               variant="contained"
+              disabled={submitting}
               sx={{
                 backgroundColor: colors.greenAccent[500],
                 color: "#000",
@@ -806,7 +857,7 @@ const BusinessProducts = () => {
                 "&:hover": { backgroundColor: colors.greenAccent[600] }
               }}
             >
-              Guardar Cambios
+              {submitting ? "Guardando..." : "Guardar Cambios"}
             </Button>
           </DialogActions>
         </form>
