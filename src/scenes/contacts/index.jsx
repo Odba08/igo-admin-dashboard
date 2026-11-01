@@ -4,6 +4,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import AddIcon from "@mui/icons-material/Add";
+import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import { useNavigate } from "react-router-dom";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
@@ -247,21 +248,42 @@ const Contacts = () => {
                 }
               }}
             />
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate("/my-business")}
-              sx={{
-                backgroundColor: colors.greenAccent[500],
-                color: "#000",
-                fontWeight: "bold",
-                px: "20px",
-                py: "9px",
-                "&:hover": { backgroundColor: colors.greenAccent[600] }
-              }}
-            >
-              Registrar Nuevo Comercio
-            </Button>
+            <Box display="flex" gap="10px">
+              <Button
+                variant="outlined"
+                startIcon={<ShoppingBagOutlinedIcon />}
+                onClick={() => {
+                  const user = JSON.parse(localStorage.getItem("user")) || {};
+                  localStorage.setItem(`myBusinessId_${user.id || "default"}`, "ALL");
+                  navigate("/my-products?businessId=ALL");
+                }}
+                sx={{
+                  borderColor: colors.blueAccent[400],
+                  color: colors.blueAccent[300],
+                  fontWeight: "bold",
+                  px: "18px",
+                  py: "9px",
+                  "&:hover": { borderColor: colors.blueAccent[500] }
+                }}
+              >
+                Ver Catálogo Global (Todos los Productos)
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => navigate("/my-business")}
+                sx={{
+                  backgroundColor: colors.greenAccent[500],
+                  color: "#000",
+                  fontWeight: "bold",
+                  px: "20px",
+                  py: "9px",
+                  "&:hover": { backgroundColor: colors.greenAccent[600] }
+                }}
+              >
+                Registrar Nuevo Comercio
+              </Button>
+            </Box>
           </Box>
 
           <Box

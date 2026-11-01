@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Box, Button, Typography, useTheme, Dialog, DialogTitle, 
   DialogContent, DialogActions, TextField, 
@@ -14,6 +14,7 @@ import CategoryIcon from "@mui/icons-material/Category";
 import Header from "../../components/Header";
 import { useSearchParams } from "react-router-dom";
 import { 
+  getProducts,
   getBusinessProducts, 
   createBusinessProduct, 
   updateBusinessProduct, 
@@ -44,6 +45,8 @@ const BusinessProducts = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [modalBusinessId, setModalBusinessId] = useState("");
 
   const isBusiness = user?.roles?.includes("bussiness") || user?.roles?.includes("business");
   const isAdmin = user?.roles?.includes("admin");
@@ -56,25 +59,19 @@ const BusinessProducts = () => {
           const list = res.data || [];
           setBusinessesList(list);
 
-          if (paramBusinessId && list.some(b => b.id === paramBusinessId)) {
+          if (paramBusinessId) {
             setMyBusinessId(paramBusinessId);
             localStorage.setItem(`myBusinessId_${userId}`, paramBusinessId);
             return;
           }
 
           const savedId = localStorage.getItem(`myBusinessId_${userId}`);
-          const exists = list.find(b => b.id === savedId);
-
-          if (exists) {
+          if (savedId === "ALL" || list.some(b => b.id === savedId)) {
             setMyBusinessId(savedId);
           } else {
-            // Dar prioridad a la Tienda Oficial IGO
-            const official = list.find(b => b.isOfficialStore || b.name?.toLowerCase().includes("oficial") || b.name?.toLowerCase().includes("igo"));
-            if (official) {
-              setMyBusinessId(official.id);
-            } else if (list.length > 0) {
-              setMyBusinessId(list[0].id);
-            }
+            // Por defecto para el Admin: Mostrar catálogo global completo
+            setMyBusinessId("ALL");
+            localStorage.setItem(`myBusinessId_${userId}`, "ALL");
           }
         } catch (err) {
           console.error("Error cargando comercios para admin:", err);
@@ -119,7 +116,7 @@ const BusinessProducts = () => {
   const [categoryLoading, setCategoryLoading] = useState(false);
 
   const fetchProducts = async (targetId) => {
-    const activeId = targetId || myBusinessId;
+    const activeId = targetId !== undefined ? targetId : myBusinessId;
     if (!activeId) {
       setProducts([]);
       setLoading(false);
@@ -129,19 +126,24 @@ const BusinessProducts = () => {
     try {
       setLoading(true);
       setError("");
-      const res = await getBusinessProducts(activeId);
-      setProducts(res.data);
+      if (activeId === "ALL") {
+        const res = await getProducts();
+        setProducts(res.data || []);
+      } else {
+        const res = await getBusinessProducts(activeId);
+        setProducts(res.data || []);
+      }
     } catch (err) {
       console.error("Error fetching products:", err);
-      setError("Error al cargar los productos de este comercio.");
+      setError("Error al cargar los productos.");
     } finally {
       setLoading(false);
     }
   };
 
   const fetchMenuCategories = async (bizId) => {
-    const activeId = bizId || myBusinessId;
-    if (!activeId) {
+    const activeId = bizId !== undefined ? bizId : myBusinessId;
+    if (!activeId || activeId === "ALL") {
       setMenuCategories([]);
       return;
     }
@@ -214,6 +216,11 @@ const BusinessProducts = () => {
     setImageUrl("");
     setMenuCategoryId("");
     setOptions([]);
+    const defaultBiz = myBusinessId !== "ALL" ? myBusinessId : (businessesList[0]?.id || "");
+    setModalBusinessId(defaultBiz);
+    if (defaultBiz) {
+      fetchMenuCategories(defaultBiz);
+    }
     setOpenModal(true);
   };
 
@@ -228,8 +235,12 @@ const BusinessProducts = () => {
     setWeight(product.weight || 0);
     setTags(product.tags ? product.tags.join(", ") : "");
     setMenuCategoryId(product.menuCategory?.id || "");
+    const bizId = product.business?.id || (myBusinessId !== "ALL" ? myBusinessId : businessesList[0]?.id) || "";
+    setModalBusinessId(bizId);
+    if (bizId) {
+      fetchMenuCategories(bizId);
+    }
     if (product.images && product.images.length > 0) {
-      // images can be strings or objects. The entity shows string[] in DTO, or string in entity relations.
       const firstImg = product.images[0];
       setImageUrl(typeof firstImg === "string" ? firstImg : firstImg.url || "");
     } else {
@@ -239,10 +250,12 @@ const BusinessProducts = () => {
     setOpenModal(true);
   };
 
-  const handleDeleteProduct = async (productId) => {
-    if (!window.confirm("¿Seguro que deseas eliminar este producto?")) return;
+  const handleDeleteProduct = async (product) => {
+    const prodTitle = product.title || "este producto";
+    if (!window.confirm(`¿Seguro que deseas eliminar el producto "${prodTitle}"?`)) return;
     try {
-      await deleteBusinessProduct(myBusinessId, productId);
+      const targetBizId = product.business?.id || (myBusinessId !== "ALL" ? myBusinessId : businessesList[0]?.id);
+      await deleteBusinessProduct(targetBizId, product.id);
       setSuccess("Producto eliminado correctamente.");
       fetchProducts(myBusinessId);
     } catch (err) {
@@ -256,6 +269,16 @@ const BusinessProducts = () => {
     setError("");
     setSuccess("");
     setSubmitting(true);
+
+    const targetBizId = myBusinessId === "ALL"
+      ? (modalBusinessId || editingProduct?.business?.id || businessesList[0]?.id)
+      : myBusinessId;
+
+    if (!targetBizId) {
+      setError("Por favor selecciona un comercio para este producto.");
+      setSubmitting(false);
+      return;
+    }
 
     const tagsArray = tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : [];
     const imagesArray = imageUrl ? [imageUrl] : [];
@@ -286,10 +309,10 @@ const BusinessProducts = () => {
 
     try {
       if (editingProduct) {
-        await updateBusinessProduct(myBusinessId, editingProduct.id, payload);
+        await updateBusinessProduct(targetBizId, editingProduct.id, payload);
         setSuccess("Producto actualizado correctamente.");
       } else {
-        await createBusinessProduct(myBusinessId, payload);
+        await createBusinessProduct(targetBizId, payload);
         setSuccess("Producto creado correctamente.");
       }
       setOpenModal(false);
@@ -304,7 +327,10 @@ const BusinessProducts = () => {
   const toggleProductApproval = async (product) => {
     try {
       const nextApproved = !product.isApproved;
-      await updateBusinessProduct(myBusinessId, product.id, { isApproved: nextApproved });
+      const targetBizId = product.business?.id || (myBusinessId !== "ALL" ? myBusinessId : businessesList[0]?.id);
+      if (targetBizId) {
+        await updateBusinessProduct(targetBizId, product.id, { isApproved: nextApproved });
+      }
       setProducts(prevProducts => 
         prevProducts.map(p => p.id === product.id ? { ...p, isApproved: nextApproved } : p)
       );
@@ -314,8 +340,40 @@ const BusinessProducts = () => {
     }
   };
 
+  const filteredProducts = useMemo(() => {
+    if (!searchText.trim()) return products;
+    const term = searchText.toLowerCase().trim();
+    return products.filter((p) => {
+      const titleMatch = p.title?.toLowerCase().includes(term);
+      const bizMatch = p.business?.name?.toLowerCase().includes(term);
+      const catMatch = p.menuCategory?.name?.toLowerCase().includes(term);
+      const tagMatch = Array.isArray(p.tags) && p.tags.some((t) => typeof t === "string" && t.toLowerCase().includes(term));
+      return Boolean(titleMatch || bizMatch || catMatch || tagMatch);
+    });
+  }, [products, searchText]);
+
   const columns = [
     { field: "title", headerName: "Título del Producto", flex: 1.5, cellClassName: "name-column--cell" },
+    ...(isAdmin ? [{
+      field: "business",
+      headerName: "Comercio / Tienda",
+      flex: 1.3,
+      renderCell: (params) => {
+        const bizName = params.row.business?.name;
+        return (
+          <Chip
+            label={bizName || "Sin Comercio Asignado"}
+            size="small"
+            sx={{
+              backgroundColor: "rgba(76, 206, 172, 0.12)",
+              color: colors.greenAccent[400],
+              fontWeight: "bold",
+              border: `1px solid ${colors.greenAccent[500]}`,
+            }}
+          />
+        );
+      }
+    }] : []),
     { 
       field: "menuCategory", 
       headerName: "Categoría Menú", 
@@ -407,7 +465,7 @@ const BusinessProducts = () => {
           <IconButton onClick={() => handleOpenEdit(params.row)} sx={{ color: colors.greenAccent[500] }}>
             <EditIcon size="small" />
           </IconButton>
-          <IconButton onClick={() => handleDeleteProduct(params.row.id)} sx={{ color: colors.redAccent[500] }}>
+          <IconButton onClick={() => handleDeleteProduct(params.row)} sx={{ color: colors.redAccent[500] }}>
             <DeleteIcon size="small" />
           </IconButton>
         </Box>
@@ -420,18 +478,18 @@ const BusinessProducts = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="15px">
         <Header 
           title="CATÁLOGO Y PRODUCTOS" 
-          subtitle={isAdmin ? "Administra los productos de la Tienda Oficial IGO o cualquier comercio afiliado" : "Administra el inventario de productos de tu comercio"} 
+          subtitle={isAdmin ? "Administra el catálogo global de productos o filtra por cualquier comercio afiliado" : "Administra el inventario de productos de tu comercio"} 
         />
 
-        {isAdmin && businessesList.length > 0 && (
-          <FormControl size="small" sx={{ minWidth: 280 }}>
+        {isAdmin && (
+          <FormControl size="small" sx={{ minWidth: 320 }}>
             <InputLabel id="select-biz-label" sx={{ color: colors.greenAccent[500], fontWeight: "bold" }}>
-              Comercio Seleccionado
+              Comercio / Vista de Catálogo
             </InputLabel>
             <Select
               labelId="select-biz-label"
-              value={myBusinessId}
-              label="Comercio Seleccionado"
+              value={myBusinessId || "ALL"}
+              label="Comercio / Vista de Catálogo"
               onChange={(e) => {
                 const val = e.target.value;
                 setMyBusinessId(val);
@@ -444,6 +502,10 @@ const BusinessProducts = () => {
                 "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.greenAccent[500], borderWidth: "1.5px" },
               }}
             >
+              <MenuItem value="ALL" sx={{ fontWeight: "bold", color: colors.greenAccent[400] }}>
+                🌐 TODOS LOS COMERCIOS (Catálogo Global Completo)
+              </MenuItem>
+              <Divider sx={{ my: 1 }} />
               {businessesList.map((b) => (
                 <MenuItem key={b.id} value={b.id}>
                   {b.isOfficialStore ? `👑 ${b.name} (Oficial IGO)` : b.name}
@@ -453,8 +515,8 @@ const BusinessProducts = () => {
           </FormControl>
         )}
 
-        {myBusinessId && (
-          <Box display="flex" gap="10px">
+        <Box display="flex" gap="10px">
+          {myBusinessId && myBusinessId !== "ALL" && (
             <Button
               variant="contained"
               startIcon={<CategoryIcon />}
@@ -468,47 +530,90 @@ const BusinessProducts = () => {
             >
               Categorías de Menú ({menuCategories.length})
             </Button>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<AddIcon />}
-              onClick={handleOpenCreate}
-              sx={{ backgroundColor: colors.greenAccent[500], color: "#000", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[600] } }}
-            >
-              Nuevo Producto
-            </Button>
-          </Box>
-        )}
+          )}
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={handleOpenCreate}
+            sx={{ backgroundColor: colors.greenAccent[500], color: "#000", fontWeight: "bold", "&:hover": { backgroundColor: colors.greenAccent[600] } }}
+          >
+            Nuevo Producto
+          </Button>
+        </Box>
       </Box>
 
       {error && <Alert severity="error" sx={{ mt: 2, bgcolor: "#2a1515", color: "#ff8888" }}>{error}</Alert>}
       {success && <Alert severity="success" sx={{ mt: 2, bgcolor: "#1b2c1b", color: "#88ff88" }}>{success}</Alert>}
 
-      {!myBusinessId ? (
+      {!myBusinessId && !isAdmin ? (
         <Alert severity="warning" sx={{ mt: 3, bgcolor: "#2a2215", color: "#ffe082", fontWeight: "bold", fontSize: "15px" }}>
           ⚠️ No tienes un comercio registrado aún. Dirígete a la sección "Mi Comercio" para crear tu establecimiento antes de administrar tus productos.
         </Alert>
       ) : (
-        <Box
-          m="20px 0 0 0"
-          height="70vh"
-          sx={{
-            "& .MuiDataGrid-root": { border: "none" },
-            "& .MuiDataGrid-cell": { borderBottom: "none" },
-            "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
-            "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
-            "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
-          }}
-        >
-          <DataGrid 
-            loading={loading} 
-            rows={products} 
-            columns={columns} 
-            getRowId={(row) => row.id} 
-            pageSize={100}
-            rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
-          />
-        </Box>
+        <>
+          {/* Buscador en tiempo real y métricas del catálogo */}
+          <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="15px" mt="20px" mb="10px">
+            <TextField
+              placeholder="🔍 Buscar por nombre, categoría, etiqueta o comercio..."
+              variant="outlined"
+              size="small"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              sx={{
+                width: { xs: "100%", sm: "420px" },
+                backgroundColor: colors.primary[400],
+                borderRadius: "6px",
+                "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.grey[700] },
+                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: colors.greenAccent[500] },
+              }}
+            />
+
+            <Box display="flex" alignItems="center" gap="10px">
+              <Chip
+                label={`Mostrando: ${filteredProducts.length} producto${filteredProducts.length === 1 ? '' : 's'}`}
+                sx={{
+                  backgroundColor: "rgba(76, 206, 172, 0.15)",
+                  color: colors.greenAccent[400],
+                  fontWeight: "bold",
+                  fontSize: "13px",
+                  border: `1px solid ${colors.greenAccent[500]}`,
+                }}
+              />
+              <Chip
+                label={`Activos: ${filteredProducts.filter(p => p.isApproved).length}`}
+                color="success"
+                size="small"
+              />
+              <Chip
+                label={`Pausados: ${filteredProducts.filter(p => !p.isApproved).length}`}
+                color="default"
+                size="small"
+              />
+            </Box>
+          </Box>
+
+          <Box
+            m="10px 0 0 0"
+            height="65vh"
+            sx={{
+              "& .MuiDataGrid-root": { border: "none" },
+              "& .MuiDataGrid-cell": { borderBottom: "none" },
+              "& .MuiDataGrid-columnHeaders": { backgroundColor: colors.blueAccent[700], borderBottom: "none" },
+              "& .MuiDataGrid-virtualScroller": { backgroundColor: colors.primary[400] },
+              "& .MuiDataGrid-footerContainer": { borderTop: "none", backgroundColor: colors.blueAccent[700] },
+            }}
+          >
+            <DataGrid 
+              loading={loading} 
+              rows={filteredProducts} 
+              columns={columns} 
+              getRowId={(row) => row.id} 
+              pageSize={100}
+              rowsPerPageOptions={[25, 50, 100, 250, 500, 1000]}
+            />
+          </Box>
+        </>
       )}
 
       {/* Modal Crear/Editar */}
@@ -571,6 +676,37 @@ const BusinessProducts = () => {
                   <Typography variant="body2" color={colors.grey[300]}>Sin imagen de producto</Typography>
                 )}
               </Box>
+
+              {isAdmin && (
+                <FormControl fullWidth sx={{ gridColumn: "span 2" }}>
+                  <InputLabel id="modal-biz-select-label" sx={{ color: colors.grey[100] }}>
+                    Comercio / Tienda Asignada *
+                  </InputLabel>
+                  <Select
+                    labelId="modal-biz-select-label"
+                    value={modalBusinessId}
+                    onChange={(e) => {
+                      const newBizId = e.target.value;
+                      setModalBusinessId(newBizId);
+                      fetchMenuCategories(newBizId);
+                    }}
+                    label="Comercio / Tienda Asignada *"
+                    required
+                    sx={{
+                      color: colors.grey[100],
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: colors.greenAccent[500],
+                      },
+                    }}
+                  >
+                    {businessesList.map((b) => (
+                      <MenuItem key={b.id} value={b.id}>
+                        {b.isOfficialStore ? `👑 ${b.name} (Oficial IGO)` : b.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
 
               <FormControl fullWidth sx={{ gridColumn: "span 2" }}>
                 <InputLabel id="menu-category-select-label" sx={{ color: colors.grey[100] }}>
