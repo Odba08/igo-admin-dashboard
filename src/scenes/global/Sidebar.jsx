@@ -17,6 +17,7 @@ import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import TwoWheelerOutlinedIcon from "@mui/icons-material/TwoWheelerOutlined";
+import ViewCarouselOutlinedIcon from "@mui/icons-material/ViewCarouselOutlined";
 
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
@@ -194,6 +195,13 @@ const Sidebar = ({ user }) => {
                   title="Catálogo y Productos"
                   to="/my-products"
                   icon={<ShoppingBagOutlinedIcon />}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
+                  title="Banners Publicitarios"
+                  to="/banners"
+                  icon={<ViewCarouselOutlinedIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />

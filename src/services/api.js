@@ -139,6 +139,23 @@ export const uploadBusinessImage = async (formData) => {
   }
 };
 
+// ================= BANNERS PUBLICITARIOS =================
+export const getBanners = () => api.get('/banners/admin/all');
+export const getActiveBanners = () => api.get('/banners');
+export const createBanner = (data) => api.post('/banners', data);
+export const updateBanner = (id, data) => api.patch(`/banners/${id}`, data);
+export const deleteBanner = (id) => api.delete(`/banners/${id}`);
+export const seedBanners = () => api.post('/banners/seed');
+export const uploadBannerImage = async (formData) => {
+  try {
+    return await uploadToImgBBDirect(formData);
+  } catch (e) {
+    return api.post('/files/products', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
+
 export default api;
 
 
