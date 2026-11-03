@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Box, Button, TextField, Typography, useTheme, Paper, Alert, InputAdornment, IconButton } from "@mui/material";
 import { Visibility, VisibilityOff, LockOutlined, EmailOutlined } from "@mui/icons-material";
 import { tokens } from "../../theme";
@@ -178,6 +179,31 @@ const Login = ({ onLoginSuccess }) => {
             </Button>
           </Box>
         </form>
+
+        <Box
+          mt="24px"
+          pt="16px"
+          sx={{
+            borderTop: "1px solid rgba(255,255,255,0.1)",
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "12px",
+          }}
+        >
+          <Link to="/soporte" style={{ color: colors.greenAccent[400], fontSize: "12px", textDecoration: "none" }}>
+            Soporte Técnico
+          </Link>
+          <Link to="/privacidad" style={{ color: colors.grey[300], fontSize: "12px", textDecoration: "none" }}>
+            Política de Privacidad
+          </Link>
+          <Link to="/copyright" style={{ color: colors.grey[300], fontSize: "12px", textDecoration: "none" }}>
+            Copyright y Legal
+          </Link>
+          <Link to="/eliminar-cuenta" style={{ color: colors.grey[300], fontSize: "12px", textDecoration: "none" }}>
+            Eliminar Cuenta
+          </Link>
+        </Box>
       </Paper>
     </Box>
   );

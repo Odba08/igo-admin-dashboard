@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Topbar from "./scenes/global/Topbar";
 import Sidebar from "./scenes/global/Sidebar";
 import Dashboard from "./scenes/dashboard";
@@ -19,10 +19,24 @@ import UserProfile from "./scenes/profile";
 import Settings from "./scenes/settings";
 import ServicesOrders from "./scenes/services-orders";
 import Banners from "./scenes/banners";
+import PublicLegalPage from "./scenes/public-legal";
 
+const PUBLIC_PATHS = [
+  "/soporte",
+  "/support",
+  "/privacidad",
+  "/privacy",
+  "/copyright",
+  "/legal",
+  "/terminos",
+  "/terms",
+  "/eliminar-cuenta",
+  "/delete-account",
+];
 
 function App() {
   const [theme, colorMode] = useMode();
+  const location = useLocation();
   const [isSidebar, setIsSidebar] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("adminToken"));
   const [user, setUser] = useState(() => {
@@ -44,6 +58,22 @@ function App() {
     setToken(null);
     setUser(null);
   };
+
+  const normalizedPath = location.pathname.toLowerCase();
+  const isPublicLegalRoute = PUBLIC_PATHS.some(
+    (p) => normalizedPath === p || normalizedPath.startsWith(`${p}/`)
+  );
+
+  if (isPublicLegalRoute) {
+    return (
+      <ColorModeContext.Provider value={colorMode}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <PublicLegalPage />
+        </ThemeProvider>
+      </ColorModeContext.Provider>
+    );
+  }
 
   // If not authenticated, render Login view
   if (!token || !user) {
