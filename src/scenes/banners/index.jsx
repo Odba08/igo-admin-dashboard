@@ -759,3 +759,4 @@ const Banners = () => {
 };
 
 export default Banners;
+
