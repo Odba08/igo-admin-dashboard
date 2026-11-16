@@ -1,7 +1,9 @@
 import { io } from 'socket.io-client';
 
-const rawEnv = (process.env.REACT_APP_API_URL || '').trim();
-const rawUrl = rawEnv || 'https://igoback-b84f.onrender.com';
+const rawEnv = (process.env.REACT_APP_API_URL || '')
+  .trim()
+  .replace(/igoback(-b84f)?\.onrender\.com/i, 'igoback-e6rg.onrender.com');
+const rawUrl = rawEnv || 'https://igoback-e6rg.onrender.com';
 const SOCKET_URL = rawUrl.replace(/\/api\/?$/, '');
 
 let socket = null;
